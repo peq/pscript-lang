@@ -1,0 +1,16 @@
+package test
+	
+	native testFail(string msg)
+	
+	native testSuccess()
+	
+	function runTest()
+		if 2 == 2
+			testSuccess()
+		else
+			testFail("defect in equality if")
+		endif
+	endfunction
+	
+	
+endpackage

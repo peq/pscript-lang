@@ -1,0 +1,16 @@
+package test
+	
+	native testFail(string msg)
+	
+	native testSuccess()
+	
+	function runTest()
+		if 5 < 10
+			testSuccess()
+		else
+			testFail("defect in lesser then if")
+		endif
+	endfunction
+	
+	
+endpackage

@@ -1,0 +1,23 @@
+package test
+	
+	native testFail(string msg)
+	
+	native testSuccess()
+	
+	
+	function runTest()
+		local i = 0
+		while i < 10
+			i = i + 1
+		endwhile
+		if i == 10
+			testSuccess()
+		else
+			testFail("defect in whileLoop")
+		endif
+	endfunction
+	
+	
+endpackage
+	
+	

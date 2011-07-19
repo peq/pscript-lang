@@ -1,0 +1,17 @@
+package test 
+
+	native testFail(string msg)
+	
+	native testSuccess()
+	
+	function runTest()
+		integer x
+		if x == 0
+			testSuccess()
+		else
+			testFail("defect in testing uninitialised variable")
+		endif
+	endfunction
+	
+	
+endpackage

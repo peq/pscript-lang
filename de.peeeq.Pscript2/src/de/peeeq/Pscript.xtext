@@ -1,0 +1,384 @@
+grammar de.peeeq.pscript.Pscript hidden (WS, ML_COMMENT, SL_COMMENT) 
+
+import "http://www.eclipse.org/emf/2002/Ecore" as ecore
+
+generate pscript "http://www.peeeq.de/pscript/Pscript"
+
+Program:
+	NL* packages+=PackageDeclaration (packages+=PackageDeclaration)* NL*;
+
+
+
+
+
+
+	
+PackageDeclaration:
+  {PackageDeclaration} 'package' name=ID 
+  	(NL* imports+=Import)*  NL*
+    (elements+=Entity NL*)*
+  'endpackage' NL*
+;	
+
+Import:
+  'import' importedNamespace=ImportString NL;
+
+ImportString:
+	ID '.' ('*'|ID)
+;
+
+
+
+Entity:
+	(TypeDef|FuncDef|VarDef|InitBlock|NativeFunc);
+
+InitBlock:
+	name='init' body=Statements 'endinit'
+;
+	
+
+
+
+
+
+TypeDef: 
+	(NativeType|ClassDef)
+;
+
+NativeFunc returns FuncDef:
+	{NativeFunc} 'constant'? 'native' name=ID 
+			(
+				  '(' (parameters+=ParameterDef (',' parameters+=ParameterDef)*)? ')'
+				| 'takes' 'nothing'
+				| 'takes' parameters+=ParameterDef (',' parameters+=ParameterDef)*
+			)
+			(
+				'returns' type=TypeExpr
+				| ('returns' 'nothing')?
+			) NL
+;
+
+
+NativeType returns TypeDef:
+	{NativeType} 'type' name=ID ('extends' superName=TypeExpr)? NL
+;
+
+/* classes and their members */	
+
+ClassDef returns TypeDef:
+	{ClassDef} 'class' name=ID   NL
+		(NL | members+=ClassMember)*  
+	'endclass' NL;	
+
+	
+ClassMember:
+	(VarDef | FuncDef);
+	
+
+VarDef:
+	{VarDef} (
+		  constant?='val' (type=TypeExpr)? name=ID '=' e=Expr
+		| (constant?='constant')?  type=TypeExpr name = ID ('=' e=Expr)?
+		| 'glob' name=ID '=' e=Expr  
+	) 
+	 NL
+;	
+
+TypeExpr:
+	{TypeExprRef} name=[TypeDef]
+	| {TypeExprBuildin} 
+		name=(
+			  'integer' 
+			| 'real' 
+			| 'string'
+			| 'boolean'
+			| 'handle'
+			| 'code'
+		)
+;
+
+
+/* functions */
+
+FuncDef:
+	'function' name=ID 
+			(
+				  '(' (parameters+=ParameterDef (',' parameters+=ParameterDef)*)? ')'
+				| 'takes' 'nothing'
+				| 'takes' parameters+=ParameterDef (',' parameters+=ParameterDef)*
+			)
+			(
+				'returns' type=TypeExpr
+				| ('returns' 'nothing')?
+			) NL
+		body=Statements 
+	'endfunction'
+	 
+; 
+
+ParameterDef returns VarDef:
+	{ParameterDef}  type=TypeExpr name=ID;	
+
+Statements:
+	{Statements} (NL | statements+=Statement)*;
+
+
+Statement:
+	StmtIf | StmtWhile | LocalVarDef | StmtSetOrCallOrVarDef | StmtCall | StmtSet | StmtReturn | StmtLoop | StmtExitwhen;
+
+
+
+
+
+
+StmtExitwhen:
+	'exitwhen' e=Expr NL
+;
+
+
+StmtLoop:
+	'loop' NL
+		body=Statements
+	'endloop' NL
+;
+
+
+
+
+	
+StmtReturn:
+	{StmtReturn} 'return' (e=Expr)? NL
+;
+
+
+StmtIf:
+	'if' cond=Expr 'then'? NL 
+		thenBlock=Statements 
+	(	
+		'elseif' elseIfConds+=Expr 'then'? NL 
+			elseIfBlocks+=Statements		
+	)*		
+	(
+		'else' NL 
+			elseBlock=Statements
+	)?
+	'endif' NL
+;
+
+
+  
+	
+StmtWhile:
+	'while' cond=Expr NL 
+		body=Statements 
+	'endwhile' NL
+;  	
+
+
+StmtSet:
+	'set' leftE=Expr '=' right=Expr NL
+;
+
+
+StmtCall:
+	'call' e=Expr NL
+;
+
+LocalVarDef returns VarDef: // TODO requires backtracking
+	{VarDef} ('local' | constant?='val') (type=TypeExpr)? name=ID ( '=' e=Expr)?
+	 NL
+;
+
+
+StmtSetOrCallOrVarDef:
+	 ( 
+	 	  {VarDef} type=TypeExpr name=ID ('=' e=Expr)? 
+	 	| {StmtCall} e=Expr ({StmtSet.left=current} opAssignment=OpAssignment right=Expr)?
+	 )  NL
+;
+
+
+OpAssignment:
+	{OpAssign} '='| {OpPlusAssign}'+='| {OpMinusAssign}'-='
+;
+	
+/* expressions */
+
+/* operator precedence (weakest first):
+or
+and
+== !=				// 
+<= >= < >			// comparisons
++ -
+* / % mod div		// mod and div work on integers, / and % for reals
+
+
++ -					// unary
+not					// unary
+
+.					// member
+*/
+
+
+Expr:
+	ExprOr
+;
+
+// TODO this is not really an expression, it should only be used at top level
+
+
+
+
+
+
+ExprOr returns Expr:
+  ExprAnd ({ExprOr.left=current} 
+    op='or' right=ExprAnd)*
+;
+ 
+ExprAnd returns Expr:
+	ExprEquality ({ExprAnd.left=current} 
+    op='and' right=ExprEquality)*
+; 
+ 
+ExprEquality returns Expr:
+	ExprComparison ({ExprEquality.left=current} 
+    op=OpEquality right=ExprComparison)*
+;
+
+OpEquality:
+	 {OpEquals} '=='
+	| {OpUnequals} '!='
+;
+  
+ 
+ExprComparison returns Expr:
+	ExprAdditive ({ExprComparison.left=current} 
+    op=OpComparison right=ExprAdditive)*
+;
+
+OpComparison:
+		{OpLessEq} '<='
+	|	{OpLess} '<'
+	| 	{OpGreaterEq} '>='
+	| 	{OpGreater} '>'
+;
+  
+
+ExprAdditive returns Expr:
+	ExprMult ({ExprAdditive.left=current} 
+    op=OpAdditive right=ExprMult)*
+;
+
+OpAdditive:
+		{OpPlus} '+'
+	|	{OpMinus} '-'
+;
+  
+
+ExprMult returns Expr:
+	ExprSign ({ExprMult.left=current} 
+    op=OpMultiplicative right=ExprSign)*
+;
+
+OpMultiplicative:
+		{OpMult} '*'
+	|	{OpDivReal} '/'
+	|	{OpModReal} '%'
+	|	{OpModInt} 'mod'
+	|	{OpModReal} 'div'
+;
+  
+
+ExprSign returns Expr: 
+      ({ExprSign} op=OpAdditive right=ExprNot)
+    | ExprNot
+;  
+
+ExprNot returns Expr: 
+    ({ExprNot} 'not' right=ExprMember)
+    | ExprMember
+;  
+
+//ExprCustomOperator returns Expr:
+//	ExprMember ({ExprCustomOperator.left=current} op=OPERATOR right=Expr)*
+//; 
+
+ExprMember returns Expr:
+	ExprSingle ({ExprMember.left=current} 
+    '.' message=ExprMemberRight)*
+;
+
+ExprMemberRight:
+	nameVal=[ClassMember] ('(' (params+=Expr (',' params+=Expr)*)? ')' )?
+	
+//	  {ExprMemberVar}   nameVal=[VarDef]
+//	| {ExprMemberMethod} nameVal=[FuncDef] parameters=ExprList
+//	| {ExprMemberMethod} nameVal=[FuncDef] '(' ')'
+;
+
+
+
+
+
+
+ExprSingle returns Expr:
+	  ExprAtomic
+	| '(' Expr ')'
+	| {ExprIntVal} intVal=INT
+	| {ExprNumVal} numVal=Number 
+	| {ExprStrval} strVal=STRING
+	| {ExprBoolVal} boolVal=('true'|'false')
+	| {ExprFuncRef} 'function' nameVal=[FuncDef]
+//	| {ExprBuildinFunction} 'buildin' name=ID (parameters=ExprList | '(' ')')
+//	| {ExprBuildinOperator} 'buildin' '(' left=Expr op=OPERATOR right=Expr ')'	
+	
+//	| buildin?='buildin' name=ID parameters=ExprList
+//	| buildin?='buildin' name=ID '(' ')'
+//	| buildin?='buildin' '(' left=Expr op=OPERATOR right=Expr ')' // build in operators
+;
+
+Number:
+	INT '.' INT
+;
+
+
+ExprAtomic returns Expr:
+	ExprFunctionCall 
+	| {ExprIdentifier} nameVal=[VarDef]
+;
+
+
+ExprFunctionCall returns Expr:
+	{ExprFunctioncall} nameVal=[FuncDef] '(' (params+=Expr (',' params+=Expr)*)? ')'
+;
+
+
+
+
+// Pseudo rules to add common super types:
+
+
+	
+// Terminals:
+terminal ID  		: ('a'..'z'|'A'..'Z'|'_') ('a'..'z'|'A'..'Z'|'_'|'0'..'9')*;
+terminal INT returns ecore::EInt: ('0'..'9')+; // TODO special ints (hex, oct, ascii)
+terminal STRING	: 
+			'"' ( '\\' ('b'|'t'|'n'|'f'|'r'|'"'|"'"|'\\') | !('\\'|'"') )* '"' 
+		;
+		
+		
+// multiline comments changed to consume whitespace to make the javadoc work		
+terminal ML_COMMENT	: '/*' -> '*/' (' '|'\t'|'\n'|'\r')*;  
+terminal SL_COMMENT 	: ('//' !('\n'|'\r')* ('\r'? '\n')?) 
+		| 'globals' | 'endglobals'
+;
+
+terminal WS			: (' '|'\t')+;
+
+terminal NL			: ('\n\r' | '\n' | '\r' | '\r\n');
+
+
+//terminal OPERATOR : ('+'|'-'|'*'|'/'|'%'|'$'|'<'|'>'|'='|'~'|'!'|'^'|'|'|'&'|':')+;
+
+terminal ANY_OTHER: .;	
