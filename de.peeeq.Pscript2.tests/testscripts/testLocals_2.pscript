@@ -1,0 +1,18 @@
+package test {
+	
+	nativetype String
+	nativetype Int
+	
+	native testFail(String msg)
+	
+	native testSuccess()
+
+	function runTest() {
+		val x = 1
+		if x == 1 { 
+			testSuccess()
+		} else {
+			testFail("defect in initialising variable on declaration")
+		}
+	}
+}
