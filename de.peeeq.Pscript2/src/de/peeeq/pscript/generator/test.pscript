@@ -1,0 +1,17 @@
+package test
+	
+	native testFail(string msg)
+	
+	native testSuccess()
+	
+	
+	function runTest()
+		if 3+4 == 7
+			testSuccess()
+		else
+			testFail("defect in if")
+		endif
+	endfunction
+	
+	
+endpackage
