@@ -1,0 +1,13 @@
+"unexpected closing parenthesis"
+	: RPAR
+;
+
+
+"unexpected opening parenthesis"
+	: LPAR Expr
+;
+
+"missing closing paranthesis"
+	: PACKAGE IDENTIFIER LBRACK NL
+		IDENTIFIER IDENTIFIER EQ LPAR Expr NL
+;

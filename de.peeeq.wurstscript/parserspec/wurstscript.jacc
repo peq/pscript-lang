@@ -1,0 +1,735 @@
+%package de.peeeq.wurstscript.parser
+%{
+	import de.peeeq.wurstscript.ast.*;
+	import java.io.IOException;
+%}
+
+%class WurstParser
+%interface WurstTokens
+%semantic Object : getValue()
+%get get()
+%next yylex()
+
+
+%token  TRUE FALSE 
+	EQEQ GTEQ LTEQ NOTEQ GT LT
+	EQ  
+	AND OR NOT
+	PLUS MINUS UMINUS 
+	MULT DIV_REAL DIV_INT MOD_REAL MOD_INT
+	DOT 
+	LPAR RPAR 
+	LSQUARE RSQUARE
+	LBRACK RBRACK 
+	COMMA   
+	NL
+	STATIC PACKAGE RETURNS FUNCTION VAL PUBLIC PUBLICREAD PRIVATE PROTECTED IMPORT NATIVETYPE INIT NATIVE INTERFACE
+	IMPLEMENTS ARRAY IF ELSE WHILE RETURN CLASS NEW NULL EXTENDS THIS CONSTRUCT ONDESTROY 
+	TYPE GLOBALS ENDGLOBALS CONSTANT ENDFUNCTION TAKES NOTHING LOCAL
+	LOOP ENDLOOP EXITWHEN SET CALL THEN ELSEIF ENDIF DESTROY CASTTO EOF
+%token INTEGER_LITERAL IDENTIFIER  STRING_LITERAL REAL_LITERAL
+// %token <Integer> INTEGER_LITERAL
+// %token <String> IDENTIFIER
+// %token <String> STRING_LITERAL
+// %token <Double> REAL_LITERAL
+
+
+%left		OR
+%left		AND
+%left	 	NOT
+%nonassoc	EQEQ GTEQ LTEQ EQ NOTEQ GT LT
+%left   	PLUS MINUS
+%left   	MULT DIV_REAL DIV_INT MOD_REAL MOD_INT
+%left		UMINUS
+%right  	DOT
+%right		NEW
+%right		CASTTO
+
+%right 		NL
+
+
+%type <Arguments> Arguments
+%type <Arguments> ArgumentRest
+%type <ArraySizes> ArraySizes
+%type <ClassDef> ClassDef
+// %type <ClassMember> ClassMember
+%type <ClassSlots	> ClassSlots
+%type <ClassSlot> ClassSlot
+// %type <ConstructorDef> ConstructorDef
+%type <CompilationUnit> CompilationUnit
+%type <CompilationUnit> CompilationUnit2
+%type <WEntity> Entity
+%type <Expr> Expr
+%type <Expr> ExprAtomic
+%type <ExprAssignable> ExprAssignable
+%type <ExprBinary> ExprBinary
+%type <ExprCast> ExprCast
+%type <ExprMemberMethod> ExprMemberMethod
+%type <ExprMemberVar> ExprMemberVar
+%type <ExprUnary> ExprUnary
+%type <ExprFunctionCall> ExprFunctionCall
+%type <ExprNewObject> ExprNewObject
+%type <FuncDef> FuncDef
+%type <FuncSignature> FuncSignature
+%type <FuncSignature > JassFuncSignature
+// %type <InitBlock> InitBlock
+%type <Indexes> Indexes
+%type <WImport> Import
+%type <LocalVarDef> LocalVarDef
+// %type <MemberDef> MemberDef
+%type <ExprMemberArrayVar> ExprMemberArrayVar
+// %type <NativeFunc> NativeFunc
+// %type <NativeType> NativeType
+// %type <OnDestroyDef > OnDestroyDef
+%type <StmtCall> StmtCall
+// %type <StmtDecRefCount> StmtDecRefCount
+%type <StmtDestroy> StmtDestroy
+%type <StmtIf> StmtIf
+// %type <StmtIncRefCount> StmtIncRefCount
+%type <StmtReturn> StmtReturn
+%type <StmtSet> StmtSet
+%type <StmtWhile	> StmtWhile
+// %type <TypeDef> TypeDef
+%type <NativeType> JassTypeDecl
+%type <TypeExpr> TypeExpr
+%type <TopLevelDeclaration> TopLevelDeclaration
+%type <GlobalVarDef> VarDef
+%type <ExprVarAccess> ExprVarAccess
+%type <ExprVarArrayAccess> ExprVarArrayAccess
+%type <WEntities> Entities
+%type <WImports> Imports
+%type <WPackage> PackageDeclaration
+%type <WParameter> Parameter
+%type <WParameters> Parameters
+%type <WParameters> OtherParameters
+%type <WParameters> JassParameters
+%type <WStatement> Statement
+%type <WStatements> ElseStatements
+%type <WStatements	> Statements
+%type <JassGlobalBlock> JassGlobalBlock
+%type <FuncDef> JassFuncDef
+%type <JassGlobalBlock> JassGlobalDecls
+%type <GlobalVarDef> JassGlobalDecl
+%type <WStatements> JassLocals
+%type <WStatements> JassStatements
+%type <WStatement> JassLocal
+%type <WStatement> JassStatement
+%type <WStatement> JassStatementIf
+%type <WStatements> JasselseIfs
+%type <NativeFunc> JassNativeDecl
+%type <JassToplevelDeclaration> JassToplevelDeclaration
+%type <VisibilityModifier> VisibilityModifier
+
+%start CompilationUnit2
+
+%%
+
+
+// zero or more newlines
+Newlines :
+	  NL Newlines 
+	| 
+;
+
+CompilationUnit : 
+	CompilationUnit2 EOF
+		{ $$ = $1; }
+;
+
+// one file = 1 or more packages
+CompilationUnit2 :
+	Newlines TopLevelDeclaration CompilationUnit2
+		{ $3.addFront($2);  $$ = $3; }
+	| Newlines
+		{ $$ = Ast.CompilationUnit(); }
+;
+
+
+TopLevelDeclaration :
+	  PackageDeclaration
+		{ $$ = $1; }
+	| JassToplevelDeclaration
+		{ $$ = $1; }
+;
+
+
+VisibilityModifier :
+	PUBLIC
+		{ $$ = Ast.VisibilityPublic(getPos($1)); }
+	| PRIVATE
+		{ $$ = Ast.VisibilityPrivate(getPos($1)); }
+	| PUBLICREAD
+		{ $$ = Ast.VisibilityPublicread(getPos($1)); }
+	|
+		{ $$ = Ast.VisibilityDefault(); }
+;
+
+
+// a package
+PackageDeclaration :
+		PACKAGE IDENTIFIER LBRACK NL
+			Imports
+			Entities
+		RBRACK
+		{ $$ = Ast.WPackage(getPos($1), getString($2), $5, $6); }
+;		
+		
+// 0 or more imports		
+Imports :
+	  Newlines Import Imports 
+	  	{ $3.addFront($2); $$ = $3; } 		
+	| Newlines
+		{ $$ = Ast.WImports(); }
+;
+
+Import :
+	IMPORT IDENTIFIER NL
+		{ $$ = Ast.WImport(getPos($1), getString($2)); }
+;
+
+Entities :
+	  Newlines Entity Entities
+	  	{ $3.addFront($2); $$ = $3; }
+	| Newlines
+		{ $$ = Ast.WEntities(); }
+;
+
+Entity :
+	VisibilityModifier NATIVETYPE IDENTIFIER EXTENDS TypeExpr NL
+		{ $$ = Ast.NativeType(getPos($2), $1, getString($3), $5); }
+	| VisibilityModifier NATIVETYPE IDENTIFIER NL
+		{ $$ = Ast.NativeType(getPos($2), $1, getString($3), Ast.NoTypeExpr()); }
+	| FuncDef
+		{ $$ = $1; }
+	| VarDef
+		{ $$ = $1; }
+	| INIT LBRACK NL Statements RBRACK NL
+		{ $$ = Ast.InitBlock(getPos($1), $4); }
+	| NATIVE FuncSignature NL
+		{ $$ = Ast.NativeFunc(getPos($1), $2); }
+	| ClassDef
+		{ $$ = $1; }
+;		
+
+ClassDef :
+	VisibilityModifier CLASS IDENTIFIER LBRACK NL ClassSlots RBRACK NL
+		{ $$ = Ast.ClassDef(getPos($2), $1, getString($3), false, $6); }
+;
+
+ClassSlots :
+	Newlines ClassSlot ClassSlots
+		{ $3.addFront($2); $$ = $3; }
+	| Newlines
+		{ $$ = Ast.ClassSlots(); }
+;
+
+ClassSlot :
+	VisibilityModifier CONSTRUCT LPAR Parameters RPAR LBRACK NL Statements RBRACK NL
+		{ $$ = Ast.ConstructorDef(getPos($2), $1, $4, $8); }
+	| ONDESTROY LBRACK NL Statements RBRACK NL
+		{ $$ = Ast.OnDestroyDef(getPos($1), $4); }
+	| VarDef
+		{ $$ = $1; }
+	| FuncDef
+		{ $$ = $1; } 
+;
+
+FuncDef :
+	VisibilityModifier FUNCTION FuncSignature LBRACK NL Statements RBRACK
+		{ $$ = Ast.FuncDef(getPos($2), $1, $3, $6); }
+;
+
+FuncSignature :
+	IDENTIFIER LPAR Parameters RPAR RETURNS TypeExpr
+		{ $$ = Ast.FuncSignature(getPos($1), getString($1), $3, $6); }
+	| IDENTIFIER LPAR Parameters RPAR
+		{ $$ = Ast.FuncSignature(getPos($1), getString($1), $3, Ast.NoTypeExpr()); }
+;
+
+Parameters :
+	Parameter OtherParameters 
+		{ $2.addFront($1); $$ = $2; }
+	|
+		{ $$ = Ast.WParameters(); }
+;
+
+OtherParameters :
+	COMMA Parameter OtherParameters 
+		{ $3.addFront($2); $$ = $3; }
+	|
+		{ $$ = Ast.WParameters(); }
+;
+
+Parameter :
+	TypeExpr IDENTIFIER
+		{ $$ = Ast.WParameter($1.getSource().copy(), $1, getString($2)); }
+;
+
+TypeExpr :
+	IDENTIFIER
+		{ $$ = Ast.TypeExpr(getPos($1), getString($1), false, Ast.ArraySizes()); }
+	| IDENTIFIER ARRAY ArraySizes
+		{ $$ = Ast.TypeExpr(getPos($1), getString($1), true, $3); }
+;
+
+ArraySizes :
+	LSQUARE Expr RSQUARE ArraySizes
+		{ $4.addFront($2); $$ = $4; }
+	|
+		{ $$ = Ast.ArraySizes(); }
+;
+
+VarDef :
+	VisibilityModifier VAL IDENTIFIER EQ Expr NL
+		{ $$ = Ast.GlobalVarDef(getPos($2), $1, true, Ast.NoTypeExpr(), getString($3), $5); }
+	| VisibilityModifier VAL TypeExpr IDENTIFIER EQ Expr NL
+		{ $$ = Ast.GlobalVarDef(getPos($2), $1, true, $3, getString($4), $6); }
+	| VisibilityModifier TypeExpr IDENTIFIER EQ Expr NL
+		{ $$ = Ast.GlobalVarDef($2.getSource().copy(), $1, false, $2, getString($3), $5); }
+	| VisibilityModifier TypeExpr IDENTIFIER NL
+		{ $$ = Ast.GlobalVarDef($2.getSource().copy(), $1, false, $2, getString($3), Ast.NoExpr()); }
+;
+
+Statements :
+	Newlines Statement Statements
+		{ $3.addFront($2); $$ = $3; }
+	| Newlines
+		{ $$ = Ast.WStatements(); }
+;
+
+Statement :
+	StmtIf 
+		{ $$ = $1; }
+	| StmtWhile
+		{ $$ = $1; } 
+	| LocalVarDef
+		{ $$ = $1; } 
+	| StmtSet
+		{ $$ = $1; }
+	| StmtCall
+		{ $$ = $1; }
+	| StmtReturn
+		{ $$ = $1; } 
+	| StmtDestroy
+		{ $$ = $1; } 
+	| error NL
+		{ $$ = Ast.StmtErr(getPos($1)); }
+;
+
+StmtDestroy :
+	DESTROY Expr NL
+		{ $$ = Ast.StmtDestroy(getPos($1), $2); }
+;
+
+StmtReturn :
+	RETURN Expr NL
+		{ $$ = Ast.StmtReturn(getPos($1), $2); }
+;
+
+StmtIf :
+	IF Expr LBRACK NL Statements RBRACK NL
+		{ $$ = Ast.StmtIf(getPos($1), $2, $5, Ast.WStatements()); }
+	| IF Expr LBRACK NL Statements RBRACK ELSE ElseStatements
+		{ $$ = Ast.StmtIf(getPos($1), $2, $5, $8); }
+;
+
+ElseStatements :
+	StmtIf 
+		{ $$ = Ast.WStatements($1); }
+	| LBRACK Statements RBRACK NL
+		{ $$ = $2; }
+;
+
+StmtWhile :
+	WHILE Expr LBRACK NL Statements RBRACK NL
+		{ $$ = Ast.StmtWhile(getPos($1), $2, $5); }
+;
+
+LocalVarDef :
+	VAL IDENTIFIER EQ Expr NL
+		{ $$ = Ast.LocalVarDef(getPos($1), true, Ast.NoTypeExpr(), getString($2), $4); }
+	| VAL TypeExpr IDENTIFIER EQ Expr NL
+		{ $$ = Ast.LocalVarDef(getPos($1), true, $2, getString($3), $5); }
+	| TypeExpr IDENTIFIER EQ Expr NL
+		{ $$ = Ast.LocalVarDef($1.getSource().copy(), false, $1, getString($2), $4); }
+	| TypeExpr IDENTIFIER NL
+		{ $$ = Ast.LocalVarDef($1.getSource().copy(), false, $1, getString($2), Ast.NoExpr()); }
+;
+
+StmtSet :
+	ExprAssignable EQ Expr NL
+		{ $$ = Ast.StmtSet($1.getSource().copy(), $1, Ast.OpAssign(),  $3); }
+;
+
+ExprAssignable :
+	ExprMemberVar
+		{ $$ = $1; } 
+	| ExprMemberArrayVar
+		{ $$ = $1; }
+	| ExprVarAccess
+		{ $$ = $1; } 
+	| ExprVarArrayAccess
+		{ $$ = $1; }
+;
+
+ExprVarAccess :
+	IDENTIFIER
+		{ $$ = Ast.ExprVarAccess(getPos($1), getString($1)); }
+;
+
+ExprVarArrayAccess :
+	IDENTIFIER Indexes
+		{ $$ = Ast.ExprVarArrayAccess(getPos($1), getString($1), $2); }
+;
+
+
+StmtCall :
+	ExprMemberMethod NL
+	  	{ $$ = $1; } 
+	| ExprFunctionCall NL
+	  	{ $$ = $1; } 
+	| ExprNewObject NL
+	  	{ $$ = $1; }
+;
+
+
+
+Expr :
+	  ExprBinary
+	  	{ $$ = $1; }
+	| ExprUnary
+	  	{ $$ = $1; }
+	| ExprMemberVar
+	  	{ $$ = $1; }
+	| ExprMemberMethod
+	  	{ $$ = $1; }
+	| ExprFunctionCall
+	  	{ $$ = $1; }
+	| ExprNewObject
+	  	{ $$ = $1; }
+	| ExprAtomic
+	  	{ $$ = $1; }
+	| ExprCast
+		{ $$ = $1; }
+;
+	
+	
+ExprCast :
+	Expr CASTTO TypeExpr 
+		{ $$ = Ast.ExprCast($1.getSource().copy(), $3, $1); } 
+;	
+	
+ExprMemberVar :
+	Expr DOT IDENTIFIER
+		{ $$ = Ast.ExprMemberVar($1.getSource().copy(), $1, getString($3)); }	
+;
+
+ExprMemberArrayVar :
+	Expr DOT IDENTIFIER Indexes
+		{ $$ = Ast.ExprMemberArrayVar($1.getSource().copy(), $1, getString($3), $4); }
+;
+
+ExprMemberMethod :
+	Expr DOT IDENTIFIER LPAR Arguments RPAR
+		{ $$ = Ast.ExprMemberMethod($1.getSource().copy(), $1, getString($3), $5); }
+;
+
+
+ExprAtomic :
+	  INTEGER_LITERAL
+		{ $$ = Ast.ExprIntVal(getPos($1), getInt($1)); }
+	| NULL
+		{ $$ = Ast.ExprNull(getPos($1)); }
+	| STRING_LITERAL
+		{ $$ = Ast.ExprStringVal(getPos($1), getString($1)); }
+	| LPAR Expr RPAR
+		{ $$ = $2; }
+	| TRUE
+		{ $$ = Ast.ExprBoolVal(getPos($1), true); } 
+	| FALSE
+		{ $$ = Ast.ExprBoolVal(getPos($1), false); }
+	| THIS
+		{ $$ = Ast.ExprThis(getPos($1)); }
+	| FUNCTION IDENTIFIER
+		{ $$ = Ast.ExprFuncRef(getPos($1), getString($1)); }
+	| REAL_LITERAL
+		{ $$ = Ast.ExprRealVal(getPos($1), getDouble($1)); }
+	| ExprVarAccess
+		{ $$ = $1; } 
+	| ExprVarArrayAccess
+		{ $$ = $1; }
+;	
+
+ExprNewObject :
+ 	NEW IDENTIFIER LPAR Arguments RPAR
+		{ $$ = Ast.ExprNewObject(getPos($1), getString($2), $4); }
+;
+
+Indexes :
+	LSQUARE Expr RSQUARE Indexes
+		{ $4.addFront($2); $$ = $4; }
+	| LSQUARE Expr RSQUARE
+		{ $$ = Ast.Indexes($2); }
+;
+
+
+
+Arguments :
+	Expr ArgumentRest
+		{ $2.addFront($1); $$ = $2; }
+	|
+		{ $$ = Ast.Arguments(); }
+;
+
+ArgumentRest :
+	COMMA Expr ArgumentRest
+		{ $3.addFront($2); $$ = $3; }
+	|
+		{ $$ = Ast.Arguments(); }
+;
+
+
+
+ExprBinary :
+	  Expr OR Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpOr(), $3); }
+	| Expr AND Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpAnd(), $3); }
+	| Expr PLUS Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpPlus(), $3); }
+	| Expr MINUS Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpMinus(), $3); }
+	| Expr MULT Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpMult(), $3); }
+	| Expr DIV_REAL Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpDivReal(), $3); }
+	| Expr DIV_INT Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpDivInt(), $3); }
+	| Expr MOD_REAL Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpModReal(), $3); }
+	| Expr MOD_INT Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpModInt(), $3); }
+	| Expr EQEQ Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpEquals(), $3); }
+	| Expr GTEQ Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpGreaterEq(), $3); }
+	| Expr LTEQ Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpLessEq(), $3); }
+	| Expr LT Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpLess(), $3); }
+	| Expr GT Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpGreater(), $3); }
+	| Expr NOTEQ Expr
+		{ $$ = Ast.ExprBinary($1.getSource().copy(), $1, Ast.OpUnequals(), $3); }
+;
+
+ExprUnary :
+	NOT Expr
+		{ $$ = Ast.ExprUnary(getPos($1), Ast.OpNot(), $2); }
+	| MINUS Expr
+		{ $$ = Ast.ExprUnary(getPos($1), Ast.OpMinus(), $2); }
+;
+
+ExprFunctionCall :
+	IDENTIFIER LPAR Arguments RPAR
+		{ $$ = Ast.ExprFunctionCall(getPos($1), getString($1), $3); }
+;
+
+
+
+
+
+
+
+// ++++++++++++++++
+// Jass stuff:
+
+JassToplevelDeclaration :
+	  JassGlobalBlock 
+		{ $$ = $1; }
+	| JassFuncDef
+		{ $$ = $1; }
+	| JassTypeDecl
+		{ $$ = $1; }
+	| JassNativeDecl
+		{ $$ = $1; }
+;
+
+
+
+JassTypeDecl :
+	TYPE IDENTIFIER EXTENDS TypeExpr NL
+		{ $$ = Ast.NativeType(getPos($1), Ast.VisibilityDefault(), getString($2), $4); }
+;
+
+
+JassGlobalBlock :
+	GLOBALS NL JassGlobalDecls ENDGLOBALS NL
+		{ $$ = $3; }
+;
+
+JassGlobalDecls :
+	Newlines JassGlobalDecl JassGlobalDecls
+		{ $3.addFront($2); $$ = $3; }
+	| Newlines 
+		{ $$ = Ast.JassGlobalBlock(); }
+;
+
+JassGlobalDecl :
+	CONSTANT TypeExpr IDENTIFIER EQ Expr NL
+		{ $$ = Ast.GlobalVarDef(getPos($1), Ast.VisibilityDefault(), true, $2, getString($3), $5); }
+	| TypeExpr IDENTIFIER EQ Expr NL
+		{ $$ = Ast.GlobalVarDef($1.getSource().copy(), Ast.VisibilityDefault(), false, $1, getString($2), $4); }
+	| TypeExpr IDENTIFIER NL
+		{ $$ = Ast.GlobalVarDef($1.getSource().copy(), Ast.VisibilityDefault(), false, $1, getString($2), Ast.NoExpr()); }
+;
+
+JassNativeDecl :
+	NATIVE JassFuncSignature NL
+		{ $$ = Ast.NativeFunc(getPos($1), $2); }
+	| CONSTANT NATIVE JassFuncSignature NL
+		{ $$ = Ast.NativeFunc(getPos($1), $3); }
+;
+
+JassFuncDef :
+	FUNCTION JassFuncSignature NL JassLocals JassStatements ENDFUNCTION NL
+		{ 
+			$4.addAll($5.removeAll());
+			$$ = Ast.FuncDef(getPos($1), Ast.VisibilityDefault(), $2, $4); 
+		}
+;
+
+
+JassFuncSignature :
+	IDENTIFIER TAKES JassParameters RETURNS TypeExpr
+		{ $$ = Ast.FuncSignature(getPos($1), getString($1), $3, $5); }
+	| IDENTIFIER TAKES JassParameters RETURNS NOTHING
+		{ $$ = Ast.FuncSignature(getPos($1), getString($1), $3, Ast.NoTypeExpr()); }
+;
+
+JassParameters :
+	 NOTHING
+		{ $$ = Ast.WParameters(); }
+	| Parameter OtherParameters 
+		{ $2.addFront($1); $$ = $2; }   
+;
+
+JassLocals :
+	  Newlines JassLocal JassLocals
+		{ $3.addFront($2); $$ = $3; }
+	| Newlines 
+		{ $$ = Ast.WStatements(); }
+;
+
+JassLocal :
+	  LOCAL TypeExpr IDENTIFIER EQ Expr NL
+		{ $$ = Ast.LocalVarDef(getPos($1), false, $2, getString($3), $5); }
+	| LOCAL TypeExpr IDENTIFIER NL
+		{ $$ = Ast.LocalVarDef(getPos($1), false, $2, getString($3), Ast.NoExpr()); }
+;
+
+JassStatements :
+	Newlines JassStatement JassStatements
+		{ $3.addFront($2); $$ = $3; }
+	| Newlines  
+		{ $$ = Ast.WStatements(); }
+;
+
+JassStatement :
+	  JassStatementIf
+		{ $$ = $1; }
+	| LOOP NL JassStatements ENDLOOP NL
+		{ $$ = Ast.StmtLoop(getPos($1), $3); }
+	| EXITWHEN Expr NL
+		{ $$ = Ast.StmtExitwhen(getPos($1), $2); }
+	| RETURN NL
+		{ $$ = Ast.StmtReturn(getPos($1), Ast.NoExpr()); }
+	| RETURN Expr NL
+		{ $$ = Ast.StmtReturn(getPos($1), $2); }
+	| SET ExprAssignable EQ Expr NL
+		{ $$ = Ast.StmtSet(getPos($1), $2, Ast.OpAssign(),  $4); }
+	| CALL ExprFunctionCall
+		{ $$ = $2; }
+;  
+
+
+JassStatementIf :
+	IF Expr THEN NL JassStatements JasselseIfs
+		{ $$ = Ast.StmtIf(getPos($1), $2, $5, $6); }
+;
+
+JasselseIfs :
+	ELSEIF Expr THEN NL JassStatements JasselseIfs
+		{ $$ = Ast.WStatements(Ast.StmtIf(getPos($1), $2,  $5, $6)); }
+	| ELSE NL JassStatements ENDIF NL 
+		{ $$ = $3; }
+	| ENDIF NL
+		{ $$ = Ast.WStatements(); }
+;
+
+%%
+
+			WurstScriptScanner lexer;
+
+	protected String currentFile;
+
+	public WurstParser(String currentFile, WurstScriptScanner lexer) {
+		this.currentFile = currentFile;
+		this.lexer = lexer;
+		yylex();
+	}
+
+	protected Symbol current;
+
+	private int get() {
+    		if (current == null) throw new Error("current symbol is null");
+            return current.type;
+    }
+
+    private Symbol getValue() {
+    		if (current == null) throw new Error("current symbol is null");
+            return current;
+    }
+
+	private int yylex() {
+		try {
+			current = lexer.yylex();
+		} catch (IOException e) {
+			throw new Error(e);
+		}
+		return current.type;
+	}
+
+	protected void yyerror(String msg) {
+		System.out.println(msg);
+	}
+
+	private WPos getPos(Object o) {
+		if (o instanceof Symbol) {
+			Symbol s = (Symbol) o;
+			return Ast.WPos(currentFile, s.line, s.column);
+		}
+		throw new Error();
+	}
+
+	private int getPos(SortPos p) {
+		return 0; // compile error, incompatible
+	}
+
+	private String getString(Object o) {
+		return (String) ((Symbol) o).value;
+	}
+	
+	private Integer getInt(Object o) {
+		return (Integer) ((Symbol) o).value;
+	}
+	
+	private Double getDouble(Object o) {
+		return (Double) ((Symbol) o).value;
+	}
+	
+	
+	protected Object getReturn() {
+		return yyrv;
+	}
+	
