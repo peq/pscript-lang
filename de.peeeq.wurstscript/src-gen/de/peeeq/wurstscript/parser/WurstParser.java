@@ -1,4 +1,4 @@
-// Output created by jacc on Thu Nov 03 23:08:05 CET 2011
+// Output created by jacc on Thu Nov 03 23:35:18 CET 2011
 
 package de.peeeq.wurstscript.parser;
 
@@ -15,8 +15,10 @@ class WurstParser implements WurstTokens {
     private Object[] yysv;
     private Object yyrv;
 
+    private int yyn;
+    
     public boolean parse() {
-        int yyn = 0;
+        yyn = 0;
         yysp = 0;
         yyst = new int[yyss];
         yyerrstatus = 3;
@@ -2692,6 +2694,9 @@ class WurstParser implements WurstTokens {
                     }
                 case 565:
                     switch (yytok) {
+                        case LBRACK:
+                            yyn = yyerr(4, 759);
+                            continue;
                         case LPAR:
                             yyn = 226;
                             continue;
@@ -5402,6 +5407,8 @@ class WurstParser implements WurstTokens {
                 return yyerr(0, 759);
             case LPAR:
                 return yyerr(1, 759);
+            case RBRACK:
+                return yyerr(3, 759);
             case NL:
                 return 3;
             case PACKAGE:
@@ -5418,6 +5425,8 @@ class WurstParser implements WurstTokens {
 
     private int yys2() {
         switch (yytok) {
+            case RBRACK:
+                return yyerr(3, 759);
             case CONSTANT:
                 return 11;
             case FUNCTION:
@@ -13298,7 +13307,9 @@ class WurstParser implements WurstTokens {
     protected String[] yyerrmsgs = {
         "unexpected closing parenthesis",
         "unexpected opening parenthesis",
-        "missing closing paranthesis"
+        "missing closing paranthesis",
+        "Excessive closing brace '}' found",
+        "Expected function parameter parentheses '()'"
     };
 
 
@@ -13364,6 +13375,10 @@ class WurstParser implements WurstTokens {
         
         protected Object getReturn() {
                 return yyrv;
+        }
+        
+        protected int getState() {
+                return yyn;
         }
         
 

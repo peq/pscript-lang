@@ -733,3 +733,7 @@ JasselseIfs :
 		return yyrv;
 	}
 	
+	protected int getState() {
+		return yyn;
+	}
+	

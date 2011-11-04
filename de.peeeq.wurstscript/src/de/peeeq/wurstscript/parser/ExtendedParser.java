@@ -51,6 +51,8 @@ public class ExtendedParser extends WurstParser {
 		if (yyerrno >= 0) {
 			msg = yyerrmsgs[yyerrno];
 		}
+		msg += "\nState = " + getState();		
+		
 		CompileError e = new CompileError(Ast.WPos(currentFile, current.line, current.column) , msg);
 		errors.add(e );
 		gui.sendError(e);

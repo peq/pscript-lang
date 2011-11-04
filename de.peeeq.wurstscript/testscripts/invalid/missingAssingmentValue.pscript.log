@@ -1,3 +1,7 @@
 Errors in validation phase:
 Error in File missingAssingmentValue.pscript line 4:5:
-Grammatical error: unexpected NL	expected: INTEGER_LITERAL, IDENTIFIER, STRING_LITERAL, REAL_LITERAL, TRUE, FALSE, NOT, MINUS, LPAR, FUNCTION, NEW, NULL, THIS
+syntax error
+State = 759
+Error in File missingAssingmentValue.pscript line 8:0:
+syntax error
+State = 759

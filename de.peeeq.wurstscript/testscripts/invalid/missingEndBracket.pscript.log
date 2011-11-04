@@ -1,3 +1,4 @@
 Errors in validation phase:
 Error in File missingEndBracket.pscript line 4:6:
-Grammatical error: unexpected EQ	expected: EQEQ, GTEQ, LTEQ, NOTEQ, GT, LT, AND, OR, PLUS, MINUS, MULT, DIV_REAL, DIV_INT, MOD_REAL, MOD_INT, DOT, RPAR, RSQUARE, LBRACK, COMMA, NL, THEN, CASTTO
+syntax error
+State = 759

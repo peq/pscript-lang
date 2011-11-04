@@ -11,3 +11,14 @@
 	: PACKAGE IDENTIFIER LBRACK NL
 		IDENTIFIER IDENTIFIER EQ LPAR Expr NL
 ;
+
+
+"Excessive closing brace '}' found"
+	: RBRACK
+	| PACKAGE IDENTIFIER LBRACK NL NL RBRACK NL NL RBRACK
+;		
+
+"Expected function parameter parentheses '()'"
+	: PACKAGE IDENTIFIER LBRACK NL
+		FUNCTION IDENTIFIER LBRACK
+;
