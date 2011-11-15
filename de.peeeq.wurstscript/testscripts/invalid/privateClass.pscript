@@ -1,0 +1,16 @@
+package bla {
+
+	class A {
+	
+	}
+	
+}
+
+
+package test {
+	import bla
+
+	init {
+		new A() // error, A is not public	
+	}
+}
