@@ -2,6 +2,7 @@ package de.peeeq.wurstscript.attributes;
 
 import de.peeeq.wurstscript.ast.AstElement;
 import de.peeeq.wurstscript.ast.ClassDef;
+import de.peeeq.wurstscript.ast.ClassOrModule;
 import de.peeeq.wurstscript.ast.Expr;
 import de.peeeq.wurstscript.ast.ExprBinary;
 import de.peeeq.wurstscript.ast.ExprBoolVal;
@@ -20,7 +21,9 @@ import de.peeeq.wurstscript.ast.ExprThis;
 import de.peeeq.wurstscript.ast.ExprUnary;
 import de.peeeq.wurstscript.ast.ExprVarAccess;
 import de.peeeq.wurstscript.ast.ExprVarArrayAccess;
+import de.peeeq.wurstscript.ast.ExtensionFuncDef;
 import de.peeeq.wurstscript.ast.FunctionDefinition;
+import de.peeeq.wurstscript.ast.FunctionImplementation;
 import de.peeeq.wurstscript.ast.ModuleDef;
 import de.peeeq.wurstscript.ast.NameDef;
 import de.peeeq.wurstscript.ast.NoTypeExpr;
@@ -56,6 +59,7 @@ import de.peeeq.wurstscript.types.PScriptTypeVoid;
 import de.peeeq.wurstscript.types.PscriptType;
 import de.peeeq.wurstscript.types.PscriptTypeClass;
 import de.peeeq.wurstscript.types.PscriptTypeModule;
+import de.peeeq.wurstscript.types.TypesHelper;
 import de.peeeq.wurstscript.utils.Utils;
 
 
@@ -131,17 +135,23 @@ public class AttrExprType {
 			@Override
 			public PscriptType case_ExprThis(ExprThis term)  {
 				// find nearest class definition
-				AstElement pos = term;
-				while (pos != null) {
+				ClassOrModule pos = term.attrNearestClassOrModule();
+				if (pos != null) {
 					if (pos instanceof ClassDef) {
 						return new PscriptTypeClass((ClassDef) pos);
 					}
 					if (pos instanceof ModuleDef) {
 						return new PscriptTypeModule((ModuleDef) pos);
 					}
-					pos = pos.getParent();
+				} else {
+					FunctionImplementation func = term.attrNearestFuncDef();
+					if (func instanceof ExtensionFuncDef) {
+						ExtensionFuncDef extensionFuncDef = (ExtensionFuncDef) func;
+						return extensionFuncDef.getExtendedType().attrTyp();
+					}
 				}
-				attr.addError(term.getSource(), "'this' can only be used inside methods");
+				
+				attr.addError(term.getSource(), "The keyword 'this' can only be used inside methods.");
 				return PScriptTypeUnknown.instance();
 			}
 
@@ -396,7 +406,23 @@ public class AttrExprType {
 				if (f.getDef().getSignature().getTyp() instanceof NoTypeExpr) {
 					return PScriptTypeVoid.instance();
 				}
-				return f.getDef().getSignature().getTyp().attrTyp();
+				PscriptType typ = f.getDef().getSignature().getTyp().attrTyp();
+				if (typ instanceof PscriptTypeModule) {
+					// example:
+					// module A 
+					//    function foo() returns thistype
+					// class C
+					//    use A
+					// ...
+					// C c = new C()
+					// c.foo() // this should return type c  
+					PscriptType leftType = term.getLeft().attrTyp();
+					if (leftType instanceof PscriptTypeClass ||
+							leftType instanceof PscriptTypeModule) {
+						typ = leftType;
+					}
+				}
+				return typ;
 			}
 
 			@Override
@@ -413,7 +439,14 @@ public class AttrExprType {
 				if (f.getSignature().getTyp() instanceof NoTypeExpr) {
 					return PScriptTypeVoid.instance();
 				}
-				return f.getSignature().getTyp().attrTyp();
+				PscriptType typ = f.getSignature().getTyp().attrTyp();
+				if (typ instanceof PscriptTypeModule) {
+					ClassOrModule classOrModule = term.attrNearestClassOrModule();
+					if (classOrModule != null) {
+						typ = TypesHelper.typeOf(classOrModule);
+					}
+				}
+				return typ;
 			}
 
 			@Override
