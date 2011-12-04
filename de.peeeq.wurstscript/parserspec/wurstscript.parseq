@@ -1,0 +1,367 @@
+package de.peeeq.wurstscript.ast
+
+
+abstract syntax:
+
+WPos ( String file, Integer line, Integer column ) // TODO use Wpos to track positions
+
+CompilationUnit * TopLevelDeclaration
+
+TopLevelDeclaration = WPackage | JassToplevelDeclaration
+
+WPackage(WPos source, String name, WImports imports, WEntities elements)
+
+WImports * WImport
+WEntities * WEntity
+
+WImport(WPos source, String packagename)
+
+WEntity = 
+	  TypeDef
+	| FuncDef
+	| GlobalVarDef
+	| ExtensionFuncDef(WPos source, Modifiers modifiers, TypeExpr extendedType, FuncSignature signature, WStatements body)
+	| InitBlock (WPos source, WStatements body)
+	| NativeFunc(WPos source, Modifiers modifiers, FuncSignature signature)
+	| ModuleDef(WPos source, Modifiers modifiers, String name, ClassSlots slots)
+
+
+TypeExpr = 
+	TypeExprSimple(WPos source, String typeName, boolean isArray, ArraySizes sizes)
+	| TypeExprThis(WPos source)
+	
+	
+OptTypeExpr = NoTypeExpr() | TypeExpr
+OptExpr = NoExpr() | Expr
+	
+TypeDef = 
+	 NativeType(WPos source, Modifiers modifiers, String name, OptTypeExpr typ)
+	|ClassDef(WPos source, Modifiers modifiers, String name, boolean unmanaged, ClassSlots slots)
+	
+ClassSlots * ClassSlot
+
+ClassSlot = 
+	  ConstructorDef(WPos source, Modifiers modifiers, WParameters params, WStatements body)
+	| OnDestroyDef(WPos source, WStatements body)
+	| ModuleUse(WPos source, String moduleName) 
+	| ClassMember
+	
+ClassMember = 
+	  GlobalVarDef
+	| FuncDef
+
+
+GlobalVarDef(WPos source, Modifiers modifiers, boolean isConstant, OptTypeExpr typ, String name, OptExpr initialExpr)
+LocalVarDef(WPos source, boolean constant, OptTypeExpr typ, String name, OptExpr initialExpr) 
+
+	
+FuncDef(WPos source, Modifiers modifiers, FuncSignature signature, WStatements body)
+	
+
+
+ArraySizes * Expr
+	
+FuncSignature(WPos source, String name, WParameters parameters, OptTypeExpr typ)	
+
+WParameters * WParameter
+WParameter(WPos source, TypeExpr typ, String name)
+	
+WStatements * WStatement
+	
+WStatement	=
+	  StmtIf(WPos source, Expr cond, WStatements thenBlock, WStatements elseBlock)
+	| StmtWhile(WPos source, Expr cond, WStatements body)
+	| StmtLoop(WPos source, WStatements body)
+	| LocalVarDef
+	| StmtSet(WPos source, ExprAssignable left, OpAssignment op, Expr right)
+	| StmtCall
+	| StmtReturn(WPos source, OptExpr obj)
+	| StmtDestroy(WPos source, Expr obj)
+//	| StmtIncRefCount(WPos source, Expr obj) 
+//	| StmtDecRefCount(WPos source, Expr obj)
+	| StmtErr(WPos source)
+	| StmtExitwhen(WPos source, Expr cond)
+	| StmtForRange(WPos source, LocalVarDef loopVar, Expr from, Expr to, WStatements body)
+	
+
+OpAssignment = OpAssign() // TODO += -= *= /= ...
+	| OpUpdateAssign
+
+OpUpdateAssign =
+	  OpPlusAssign()
+	| OpMultAssign()
+	| OpMinusAssign()
+
+StmtCall = ExprMemberMethod | ExprFunctionCall | ExprNewObject
+
+// an expression which you can assign a value to
+ExprAssignable = ExprMemberVar | ExprMemberArrayVar | ExprVarAccess | ExprVarArrayAccess
+
+Expr = 
+	ExprAssignable
+	| ExprBinary(WPos source, Expr left, OpBinary op, Expr right)
+	| ExprUnary(WPos source, OpUnary op, Expr right)
+	| ExprMemberVar(WPos source, Expr left, String varName)
+	| ExprMemberArrayVar(WPos source, Expr left, String varName, Indexes indexes)
+	| ExprMemberMethod(WPos source, Expr left, String funcName, Arguments args)
+	| ExprFunctionCall(WPos source, String funcName, Arguments args)
+	| ExprNewObject(WPos source, String typeName, Arguments args)
+	| ExprCast(WPos source, TypeExpr typ, Expr expr)
+	| ExprAtomic
+	
+	
+ExprAtomic = 
+	  ExprIntVal(WPos source, int val)
+	| ExprRealVal(WPos source, double val)
+	| ExprStringVal(WPos source, String val)
+	| ExprBoolVal(WPos source, boolean val)
+	| ExprFuncRef(WPos source, String funcName)
+	| ExprVarAccess(WPos source, String varName)
+	| ExprVarArrayAccess(WPos source, String varName, Indexes indexes)
+	| ExprThis(WPos source)
+	| ExprNull(WPos source)
+	
+	
+Indexes * Expr
+Arguments * Expr
+	
+	
+OpBinary = 
+	  OpOr() 
+	| OpAnd()
+	| OpEquals()
+	| OpUnequals()
+	| OpLessEq()
+	| OpLess()
+	| OpGreaterEq()
+	| OpGreater()
+	| OpPlus()
+	| OpMinus()
+	| OpMult()
+	| OpDivReal()
+	| OpModReal()
+	| OpModInt()
+	| OpDivInt()
+	
+OpUnary = 
+	  OpNot()
+	| OpMinus
+	
+Op = OpBinary | OpUnary	
+	
+// auxiliary types:
+
+// a reference to a variable, needs a varName:String attribute
+NameRef = ExprVarArrayAccess | ExprVarAccess | ExprMemberVar | ExprMemberArrayVar
+
+VarDef = 
+	GlobalVarDef
+	| LocalVarDef
+	| WParameter
+
+// has funcName:String attribute
+FuncRef = ExprFuncRef | ExprMemberMethod | ExprFunctionCall
+	
+FunctionDefinition = NativeFunc | FuncDef | ExtensionFuncDef	
+	
+FunctionImplementation = FuncDef | ExtensionFuncDef
+
+WScope = PackageOrGlobal |  ClassOrModule | FuncDef | ExtensionFuncDef | ConstructorDef | OnDestroyDef | InitBlock
+
+PackageOrGlobal = WPackage | CompilationUnit	
+	
+TypeRef = TypeExpr | ExprNewObject
+
+NameDef = VarDef | ClassDef | ModuleDef
+
+VisibilityModifier = 
+	  VisibilityPublic(WPos source) 
+	| VisibilityPrivate(WPos source) 
+	| VisibilityPublicread(WPos source) 
+	| VisibilityProtected(WPos source)
+	| VisibilityDefault(WPos source)
+
+Modifiers * Modifier
+
+Modifier = 
+	  VisibilityModifier
+	| ModStatic(WPos source)
+	| ModOverride(WPos source)
+	| ModAbstract(WPos source)
+	
+
+AstElementWithModifier = TypeDef | ConstructorDef | GlobalVarDef | FuncDef | FunctionDefinition
+	
+ClassOrModule = ClassDef | ModuleDef	
+	
+// Jass types:
+
+
+JassToplevelDeclaration = JassGlobalBlock | FunctionDefinition | NativeType
+
+JassGlobalBlock * GlobalVarDef
+
+
+
+attributes:
+
+ExprNewObject.attrConstructorDef 
+	returns ConstructorDef 
+	implemented by de.peeeq.wurstscript.attributes.AttrConstructorDef.calculate
+
+
+WStatements.attrDoesReturn
+	returns boolean 
+	implemented by de.peeeq.wurstscript.attributes.AttrDoesReturn.calculate
+
+WPackage.attrExportedFunctions
+	returns com.google.common.collect.Multimap<String, FunctionDefinition>
+	implemented by de.peeeq.wurstscript.attributes.AttrExportedFunctions.calculate
+
+OptTypeExpr.attrTyp
+	returns de.peeeq.wurstscript.types.PscriptType
+	implemented by de.peeeq.wurstscript.attributes.AttrTypeExprType.calculate
+
+
+Expr.attrTyp
+	returns de.peeeq.wurstscript.types.PscriptType 
+	implemented by de.peeeq.wurstscript.attributes.AttrExprType.calculate
+
+
+FuncRef.attrFuncDef
+	returns de.peeeq.wurstscript.attributes.FuncDefInstance
+	implemented by de.peeeq.wurstscript.attributes.AttrFuncDef.calculate
+
+
+
+NameRef.attrNameDef
+	returns NameDef
+	implemented by de.peeeq.wurstscript.attributes.AttrNameDef.calculate
+
+WScope.attrScopeNames
+	returns java.util.Map<String, NameDef>
+	implemented by de.peeeq.wurstscript.attributes.AttrScopeNames.calculate
+
+WScope.attrScopePackageNames
+	returns java.util.Map<String, NameDef>
+	implemented by de.peeeq.wurstscript.attributes.AttrScopeNames.calculatePackage
+	
+WScope.attrScopePublicNames
+	returns java.util.Map<String, NameDef>
+	implemented by de.peeeq.wurstscript.attributes.AttrScopeNames.calculatePublic
+
+WScope.attrScopePublicReadNamess
+	returns java.util.Map<String, NameDef>
+	implemented by de.peeeq.wurstscript.attributes.AttrScopeNames.calculatePublicRead
+
+
+WScope.attrScopeFunctions
+	returns com.google.common.collect.Multimap<String, de.peeeq.wurstscript.attributes.FuncDefInstance>
+	implemented by de.peeeq.wurstscript.attributes.AttrScopeFunctions.calculate
+
+WScope.attrScopePackageFunctions
+	returns com.google.common.collect.Multimap<String, de.peeeq.wurstscript.attributes.FuncDefInstance>
+	implemented by de.peeeq.wurstscript.attributes.AttrScopeFunctions.calculatePackage
+
+WScope.attrScopePublicFunctions
+	returns com.google.common.collect.Multimap<String, de.peeeq.wurstscript.attributes.FuncDefInstance>
+	implemented by de.peeeq.wurstscript.attributes.AttrScopeFunctions.calculatePublic
+
+
+
+NameDef.attrTyp
+	returns de.peeeq.wurstscript.types.PscriptType 
+	implemented by de.peeeq.wurstscript.attributes.AttrVarDefType.calculate
+
+
+VarDef.attrIsClassMember
+	returns boolean
+	implemented by de.peeeq.wurstscript.attributes.AttrIsClassMember.calculate
+
+PackageOrGlobal.attrPackageElements
+	returns com.google.common.collect.Multimap<String, WEntity>
+	implemented by de.peeeq.wurstscript.attributes.AttrPackageElements.calculate
+	
+	
+
+AstElement.attrNearestPackage
+	returns PackageOrGlobal
+	implemented by de.peeeq.wurstscript.attributes.AttrNearestPackage.calculate
+
+
+AstElement.attrNearestFuncDef
+	returns FunctionImplementation
+	implemented by de.peeeq.wurstscript.attributes.AttrNearestFuncDef.calculate
+
+ModuleUse.attrModuleDef
+	returns ModuleDef
+	implemented by de.peeeq.wurstscript.attributes.AttrModuleDef.calculate
+
+TypeRef.attrTypeDef
+	returns TypeDef
+	implemented by de.peeeq.wurstscript.attributes.AttrTypeDef.calculate
+
+AstElement.attrNearestClassDef
+	returns ClassDef
+	implemented by de.peeeq.wurstscript.attributes.AttrNearestClassDef.calculate
+
+AstElement.attrNearestClassOrModule
+	returns ClassOrModule
+	implemented by de.peeeq.wurstscript.attributes.AttrNearestClassDef.nearestClassOrModule
+
+
+
+WPackage.attrExportedVariables
+	returns java.util.Map<String, VarDef>
+	implemented by de.peeeq.wurstscript.attributes.AttrExportedVariables.calculate
+	
+	
+WPackage.attrExportedTypes
+	returns java.util.Map<String, TypeDef>
+	implemented by de.peeeq.wurstscript.attributes.AttrExportedTypes.calculate
+
+AstElementWithModifier.attrIsPublic
+	returns boolean
+	implemented by de.peeeq.wurstscript.attributes.ModifiersHelper.isPublic
+
+AstElementWithModifier.attrIsPublicRead
+	returns boolean
+	implemented by de.peeeq.wurstscript.attributes.ModifiersHelper.isPublicRead
+
+AstElementWithModifier.attrIsPrivate
+	returns boolean
+	implemented by de.peeeq.wurstscript.attributes.ModifiersHelper.isPrivate
+
+AstElementWithModifier.attrIsStatic
+	returns boolean
+	implemented by de.peeeq.wurstscript.attributes.ModifiersHelper.isStatic
+
+AstElementWithModifier.attrIsOverride
+	returns boolean
+	implemented by de.peeeq.wurstscript.attributes.ModifiersHelper.isOverride
+
+	AstElementWithModifier.attrIsAbstract
+	returns boolean
+	implemented by de.peeeq.wurstscript.attributes.ModifiersHelper.isAbstract
+
+	
+	
+FunctionDefinition.attrOverriddenFunctions
+	returns java.util.Collection<de.peeeq.wurstscript.attributes.FuncDefInstance>
+	implemented by de.peeeq.wurstscript.attributes.OverriddenFunctions.calculate
+
+ClassOrModule.attrAllFunctions
+	returns com.google.common.collect.Multimap<String, de.peeeq.wurstscript.attributes.FuncDefInstance>
+	implemented by de.peeeq.wurstscript.attributes.AttrAllFunctions.calculate
+
+
+ClassOrModule.attrUsedModules
+	returns java.util.Collection<ModuleDef>
+	implemented by de.peeeq.wurstscript.attributes.AttrUsedModules.calculate
+
+
+
+
+
+
+
