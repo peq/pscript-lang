@@ -1,0 +1,65 @@
+package TimerUtils
+	
+	
+	timer array freeTimers
+	integer freeTimersCount = 0
+	hashtable ht = InitHashtable()
+	
+	public function getTimer() returns timer
+		if freeTimersCount > 0
+			freeTimersCount -= 1
+			return freeTimers[freeTimersCount]
+		else
+			return CreateTimer()
+	
+	public function timer.setData(integer data)
+		SaveInteger(ht, 0, GetHandleId(this), data)
+		
+	
+	public function timer.getData() returns integer
+		return LoadInteger(ht, 0, GetHandleId(this))
+	
+	
+	public function timer.release()
+		PauseTimer(this)
+		freeTimers[freeTimersCount] = this
+		freeTimersCount += 1
+	
+	
+	public module Timed
+		abstract public function onTimer()
+		
+		private static function timerCallback()
+			timer t = GetExpiredTimer()
+			thistype c = t.getData() castTo thistype
+			c.onTimer()
+			t.release()
+		
+		public function startTimer(real time)
+			timer t = getTimer()
+			t.setData(this castTo integer)
+			TimerStart(t, time, false, function timerCallback)
+	
+	public module Periodic
+	
+		private timer t
+	
+		abstract public function periodic()
+		
+		public function stopPeriodic()
+			t.release()
+			t = null
+		
+		private static function timerCallback()
+			t = GetExpiredTimer()
+			thistype c = t.getData() castTo thistype
+			c.periodic()
+		
+		public function startPeriodic(real time)
+			timer t = getTimer()
+			t.setData(this castTo integer)
+			TimerStart(t, time, true, function timerCallback)
+
+endpackage
+
+
