@@ -1,0 +1,22 @@
+package OnCast
+	import TriggerUtils
+	
+	
+	public module OnPointCast
+		static trigger t = null
+		
+		public abstract static function onPointCast(unit caster, real targetX, real targetY)
+	
+		private static function actions() returns boolean
+			onPointCast(GetSpellAbilityUnit(), GetSpellTargetX(), GetSpellTargetY())
+			return false
+	
+		public static function registerSpellEvent(int spellId)
+			CreateTrigger()
+				.registerAnyUnitEvent(EVENT_PLAYER_UNIT_SPELL_EFFECT)
+				.addCondition(Condition(function actions))
+		
+	// TODO add other onCast modules (unit target etc...)
+	
+		
+endpackage
