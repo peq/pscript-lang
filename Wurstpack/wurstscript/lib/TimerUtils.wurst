@@ -1,0 +1,144 @@
+package TimerUtils
+// 
+//	Credits: 
+//		* Vexorian (original TimerUtils + TimedLoop)
+//		* Nestharus (orignial Constant Timer Loop 32)
+	
+	// basic TimerUtils functions with Timer-Pool and setData/getData functions
+		
+	timer array freeTimers
+	integer freeTimersCount = 0
+	hashtable ht = InitHashtable()
+	
+	public function getTimer() returns timer
+		if freeTimersCount > 0
+			freeTimersCount -= 1
+			return freeTimers[freeTimersCount]
+		else
+			return CreateTimer()
+	
+	public function timer.setData(integer data)
+		SaveInteger(ht, 0, GetHandleId(this), data)
+		
+	
+	public function timer.getData() returns integer
+		return LoadInteger(ht, 0, GetHandleId(this))
+
+	
+	public function timer.release()
+		this.pause()
+		freeTimers[freeTimersCount] = this
+		freeTimersCount += 1
+	
+	public function timer.pause()
+		PauseTimer(this)
+	
+	public function timer.start(real time, code timerCallBack)
+		TimerStart(this, time, false, timerCallBack)
+	
+	public function timer.startPeriodic(real time, code timerCallBack)
+		TimerStart(this, time, true, timerCallBack)
+	
+	// module to execute a function after a certain time
+	public module Timed
+		abstract public function onTimer()
+		
+		private static function timerCallback()
+			timer t = GetExpiredTimer()
+			thistype c = t.getData() castTo thistype
+			c.onTimer()
+			t.release()
+		
+		public function startTimer(real time)
+			timer t = getTimer()
+			t.setData(this castTo integer)
+			TimerStart(t, time, false, function timerCallback)
+	
+	// module to execute a function periodically
+	public module Periodic
+	
+		private timer t
+	
+		abstract public function periodic()
+		
+		public function stopPeriodic()
+			t.release()
+			t = null
+		
+		private static function timerCallback()
+			timer t = GetExpiredTimer()
+			thistype c = t.getData() castTo thistype
+			c.periodic()
+		
+		public function startPeriodic(real time)
+			t = getTimer()
+			t.setData(this castTo integer)
+			TimerStart(t, time, true, function timerCallback)
+	
+	
+	// TimedLoop
+	// originally created by Vexorian
+	// augmented by some ideas from "Constant Timer Loop 32" by Nestharus
+	
+	
+	timer timedLoopTimer = CreateTimer()
+	trigger timedLoopTrig = CreateTrigger()
+	int conditionCount
+	
+	function evaluateTimedLoopTrig()
+		BJDebugMsg("timedLoop - evaluate")
+		TriggerEvaluate(timedLoopTrig)
+		if conditionCount == 0
+			timedLoopTimer.pause()
+	
+	
+	public module TimedLoop
+		public constant static real PERIOD = 0.025
+		static thistype array instances		// The array
+		static integer instanceCount = 0	// The count
+		static triggercondition triggerCond = null // the triggerCondition for this
+		static conditionfunc cond = Condition(function onExpire)
+	
+		public boolean stopped = false
+	
+		public abstract function onTimedLoop()
+	
+		private static function onExpire() returns boolean
+			int i = instanceCount - 1
+			while i >= 0
+				thistype t = instances[i]
+				t.onTimedLoop()
+				if (t.stopped)
+					instanceCount--
+					instances[i] = instances[instanceCount]
+					destroy t
+				i -= 1
+			if instanceCount == 0
+				TriggerRemoveCondition(timedLoopTrig, triggerCond)
+				triggerCond = null
+				conditionCount--
+			return false
+	
+		public function stopTimedLoop()
+			stopped = true
+	
+		public function startTimedLoop()
+			BJDebugMsg("timedLoop - 1")
+			instances[instanceCount] = this
+			instanceCount++
+			BJDebugMsg("timedLoop - 2")
+			if instanceCount == 1
+				BJDebugMsg("timedLoop - 3")
+				if triggerCond == null
+					BJDebugMsg("timedLoop - 4")
+					triggerCond = TriggerAddCondition(timedLoopTrig, cond)
+					conditionCount++
+					BJDebugMsg("timedLoop - 5")
+					if conditionCount == 1
+						BJDebugMsg("timedLoop - 6")
+						timedLoopTimer.startPeriodic(PERIOD, function evaluateTimedLoopTrig)	 
+						BJDebugMsg("timedLoop - 7")
+
+endpackage
+
+
