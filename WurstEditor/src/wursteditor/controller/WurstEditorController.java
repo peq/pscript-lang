@@ -20,7 +20,6 @@ import com.google.common.io.PatternFilenameFilter;
 
 import de.peeeq.wurstscript.attributes.CompileError;
 
-import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import wursteditor.WurstEditFileView;
 import wursteditor.WurstEditorView;
 
@@ -30,18 +29,13 @@ import wursteditor.WurstEditorView;
 public class WurstEditorController {
 	private WurstEditorView view;
 
-	private static WurstEditorController instance = null;
-	
-	public static WurstEditorController getInstance() {
-		return instance;
-	}
 	
 	public WurstEditorController(final WurstEditorView v) {
-		instance = this;
 		v.getOpenProjectButton().addActionListener(onClick_openProject());
 		v.getSaveFileButton().addActionListener(onClick_saveFile());
 		v.getUndoButton().addActionListener(onclick_undo(v));
 		v.getRedoButton().addActionListener(onclick_redo(v));
+		
 	}
 
 	
@@ -51,7 +45,7 @@ public class WurstEditorController {
 			
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				((RSyntaxTextArea)v.getSyntaxCodeArea()).redoLastAction();
+				v.getSyntaxCodeArea().redoLastAction();
 			}
 		};
 	}
@@ -61,7 +55,7 @@ public class WurstEditorController {
 			
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				((RSyntaxTextArea)v.getSyntaxCodeArea()).undoLastAction();
+				v.getSyntaxCodeArea().undoLastAction();
 			}
 		};
 	}
@@ -99,7 +93,7 @@ public class WurstEditorController {
 		}
 		
 		
-		WurstEditFileView fileView = new WurstEditFileView(file.getAbsolutePath());
+		WurstEditFileView fileView = new WurstEditFileView(file.getAbsolutePath(), view.getErrorList());
 		String text = "";
 		try {
 			text = Files.toString(file, Charsets.UTF_8);
@@ -128,16 +122,13 @@ public class WurstEditorController {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
+					// reparse
+					we.getSyntaxCodeArea().addNotify();
 				} else {
 					System.err.println("no file selected");
 				}
 			}
 		};
-	}
-
-	@SuppressWarnings("unchecked")
-	public void setErrors(List<CompileError> errorList) {
-		view.getErrorList().setListData(errorList.toArray());
 	}
 
 }
