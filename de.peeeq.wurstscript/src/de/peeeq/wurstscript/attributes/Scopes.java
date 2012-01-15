@@ -19,8 +19,10 @@ import de.peeeq.wurstscript.ast.ClassSlot;
 import de.peeeq.wurstscript.ast.ClassSlots;
 import de.peeeq.wurstscript.ast.CompilationUnit;
 import de.peeeq.wurstscript.ast.FuncDef;
+import de.peeeq.wurstscript.ast.FuncSignature;
 import de.peeeq.wurstscript.ast.FunctionDefinition;
 import de.peeeq.wurstscript.ast.GlobalVarDef;
+import de.peeeq.wurstscript.ast.InterfaceDef;
 import de.peeeq.wurstscript.ast.JassGlobalBlock;
 import de.peeeq.wurstscript.ast.LocalVarDef;
 import de.peeeq.wurstscript.ast.ModuleDef;
@@ -216,9 +218,23 @@ public class Scopes {
 
 	public static Multimap<String, NameDef> getExportedNames(WPackage p) {
 		Multimap<String, NameDef> result = HashMultimap.create();
-		for (Entry<String, NameDef> e : p.attrVisibleNamesPrivate().entries()) {
+		for (Entry<String, NameDef> e : p.attrDefinedNames().entries()) {
 			if (e.getValue().attrIsPublic()) {
 				result.put(e.getKey(), e.getValue());
+			}
+		}
+		return result;
+	}
+
+
+	public static Multimap<String, NameDef> getDefinedNames(InterfaceDef i) {
+		Multimap<String, NameDef> result = HashMultimap.create();
+		for (ClassSlot s : i.getSlots()) {
+			if (s instanceof FuncDef) {
+				FuncDef f = (FuncDef) s;
+				result.put(f.getName(), f);
+			} else {
+				throw new Error("Interface with " + s.getClass().getSimpleName());
 			}
 		}
 		return result;
