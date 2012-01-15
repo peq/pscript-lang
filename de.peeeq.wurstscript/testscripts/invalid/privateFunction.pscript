@@ -1,0 +1,14 @@
+package bla {
+
+	function foo() {
+	}
+}
+
+
+package test {
+	import bla
+
+	init {
+		foo() // error, foo is not public	
+	}
+}

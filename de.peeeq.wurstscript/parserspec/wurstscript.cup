@@ -1,0 +1,784 @@
+package de.peeeq.wurstscript.parser;
+
+import java_cup.runtime.*;
+import de.peeeq.wurstscript.ast.*;
+
+
+action code {: 
+
+	private WPos pos(int left, int right) {
+		return Ast.WPos(parser.filename, parser.scanner.lineStartOffsets, left, right);
+	}
+	
+	private WPos pos(WPos left, WPos right) {
+		return Ast.WPos(left.getFile(), left.getLineOffsets(), left.getLeftPos(), right.getRightPos());
+	}
+	
+	private WPos pos(int left, WPos right) {
+		return Ast.WPos(right.getFile(), right.getLineOffsets(), left, right.getRightPos());
+	}
+	
+	private WPos pos(WPos left, int right) {
+		return Ast.WPos(left.getFile(), left.getLineOffsets(), left.getLeftPos(), right);
+	}
+	
+	private WPos pos(AstElementWithSource left, int right) {
+		return pos(left.getSource(), right);
+	}
+	
+	private WPos pos(AstElementWithSource left, AstElementWithSource right) {
+		return pos(left.getSource(), right.getSource());
+	}
+	
+	private WPos pos(int left, AstElementWithSource right) {
+		return pos(left, right.getSource());
+	}
+
+:};
+
+parser code {: 
+	protected String filename = "";
+	protected WurstScriptScanner scanner;
+:};
+
+terminal Integer INTEGER_LITERAL;
+terminal String IDENTIFIER;
+terminal String STRING_LITERAL;
+terminal Double REAL_LITERAL;
+terminal 
+	CUSTOM_ERROR,
+	TRUE, FALSE, 
+	EQEQ, GTEQ, LTEQ, NOTEQ, GT, LT,
+	EQ, PLUS_EQ, MINUS_EQ, MULT_EQ, PLUS_PLUS, MINUS_MINUS,
+	AND, OR, NOT,
+	PLUS, MINUS, UMINUS, 
+	MULT, DIV_REAL, DIV_INT, MOD_REAL, MOD_INT,
+	DOT, 
+	LPAR, RPAR, 
+	LSQUARE, RSQUARE,
+	INDENT, UNINDENT,
+	LBRACK, RBRACK, 
+	COMMA, SEMICOLON,   
+	NL,
+	MODULE, USE, ABSTRACT, IN, FOR, TO, DOWNTO, STEP, BREAK, THISTYPE, ARROW, IT, IMMUTABLE, OVERRIDE,
+	STATIC, PACKAGE, ENDPACKAGE, RETURNS,FUNCTION, VAL, PUBLIC, PUBLICREAD, PRIVATE, PROTECTED, IMPORT, NATIVETYPE, INIT, NATIVE, INTERFACE,
+	IMPLEMENTS, ARRAY, IF, ELSE, WHILE, RETURN, CLASS, NEW, NULL, EXTENDS, THIS, CONSTRUCT, ONDESTROY, 
+	TYPE, GLOBALS, ENDGLOBALS, CONSTANT, ENDFUNCTION, TAKES, NOTHING, LOCAL,
+	LOOP, ENDLOOP, EXITWHEN, SET, CALL, THEN, ELSEIF, ENDIF, DESTROY, CASTTO;
+
+
+// non terminal <ReturnType> <RuleName>
+non terminal Arguments Arguments;
+non terminal Arguments ArgumentRest;
+non terminal ClassDef ClassDef;
+non terminal ClassSlots ClassSlots;	
+non terminal ClassSlot ClassSlot;
+non terminal CompilationUnit CompilationUnit;
+non terminal WEntity Entity;
+non terminal Expr Expr;
+non terminal Expr ExprAtomic;
+non terminal NameRef ExprAssignable;
+non terminal ExprBinary ExprBinary;
+non terminal ExprCast ExprCast;
+non terminal ExprMemberMethod ExprMemberMethod;
+non terminal ExprMemberVar ExprMemberVar;
+non terminal ExprUnary ExprUnary;
+non terminal ExprFunctionCall ExprFunctionCall;
+non terminal ExprNewObject ExprNewObject;
+non terminal FuncDef FuncDef;
+non terminal FuncSignature FuncSignature;
+non terminal FuncSignature JassFuncSignature; 
+non terminal Indexes Indexes;
+non terminal WImport Import;
+non terminal LocalVarDef LocalVarDef;
+non terminal LocalVarDef LocalVarDefInline;
+non terminal ExprMemberArrayVar ExprMemberArrayVar;
+non terminal Newlines;
+non terminal StmtCall StmtCall;
+non terminal StmtDestroy StmtDestroy;
+non terminal StmtIf StmtIf;
+non terminal StmtReturn StmtReturn;
+non terminal StmtSet StmtSet;
+non terminal StmtWhile StmtWhile;	
+non terminal NativeType JassTypeDecl;
+non terminal TypeExpr TypeExpr;
+non terminal TopLevelDeclaration TopLevelDeclaration;
+non terminal TypeParamDefs TypeParamDefList;
+non terminal TypeParamDefs TypeParamDefs;
+non terminal TypeParams TypeParams;
+non terminal TypeParams TypeParamList;
+non terminal GlobalVarDef VarDef;
+non terminal ExprVarAccess ExprVarAccess;
+non terminal ExprVarArrayAccess ExprVarArrayAccess;
+non terminal WEntities Entities;
+non terminal WImports Imports;
+non terminal WPackage PackageDeclaration;
+non terminal WParameter Parameter;
+non terminal WParameters Parameters;	
+non terminal WParameters OtherParameters;
+non terminal WParameters JassParameters;
+non terminal WStatement Statement;
+non terminal WStatements ElseStatements;
+non terminal WStatements Statements;	
+non terminal JassGlobalBlock JassGlobalBlock;
+non terminal FuncDef JassFuncDef;
+non terminal JassGlobalBlock JassGlobalDecls;
+non terminal GlobalVarDef JassGlobalDecl;
+non terminal WStatements JassLocals;
+non terminal WStatements JassStatements;
+non terminal WStatement JassLocal;
+non terminal WStatement JassStatement; 
+non terminal WStatement JassStatementIf;
+non terminal WStatements JasselseIfs;
+non terminal NativeFunc JassNativeDecl;
+non terminal JassToplevelDeclaration JassToplevelDeclaration;
+non terminal Modifier Modifier;
+non terminal Modifiers Modifiers;
+non terminal ModuleDef ModuleDef;
+
+precedence left		OR;
+precedence left		AND;
+precedence left 	NOT;
+precedence nonassoc EQEQ, GTEQ, LTEQ, EQ, NOTEQ, GT, LT;
+precedence left     PLUS,MINUS;
+precedence left     MULT, DIV_REAL, DIV_INT, MOD_REAL, MOD_INT;
+precedence left		UMINUS;
+precedence right    DOT;
+precedence left 	NL;
+precedence right	NEW;
+precedence right	CASTTO;
+
+start with CompilationUnit;
+
+// zero or more newlines
+Newlines ::= 
+	  NL Newlines 
+	| 
+;
+
+// one file = 1 or more packages
+CompilationUnit ::=
+	Newlines TopLevelDeclaration:p CompilationUnit:c
+		{: c.addFront(p);  RESULT = c; :}
+	| Newlines
+		{: RESULT = Ast.CompilationUnit(); :}
+;
+
+
+TopLevelDeclaration ::=
+	  PackageDeclaration:x
+		{: RESULT = x; :}
+	| JassToplevelDeclaration:x
+		{: RESULT = x; :}
+;
+
+
+
+
+
+// a package
+PackageDeclaration ::=
+		PACKAGE:x IDENTIFIER:name NL INDENT
+			Imports:imports
+			Entities:entities
+		UNINDENT ENDPACKAGE:y
+		{: RESULT = Ast.WPackage(pos(xleft, yright), name, imports, entities); :}
+;		
+		
+// 0 or more imports		
+Imports ::=
+	  Newlines Import:i Imports:imports 
+	  	{: imports.addFront(i); RESULT = imports; :} 		
+	| Newlines
+		{: RESULT = Ast.WImports(); :}
+;
+
+Import ::=
+	IMPORT:x IDENTIFIER:i NL
+		{: RESULT = Ast.WImport(pos(xleft, iright), i); :}
+;
+
+Entities ::=
+	  Newlines Entity:x Entities:xs
+	  	{: xs.addFront(x); RESULT = xs; :}
+	| Newlines
+		{: RESULT = Ast.WEntities(); :}
+;
+
+Entity ::=
+	Modifiers:mod NATIVETYPE:x IDENTIFIER:name EXTENDS TypeExpr:extendsName NL
+		{: RESULT = Ast.NativeType(pos(xleft, extendsName), mod, name, extendsName); :}
+	| Modifiers:mod NATIVETYPE:x IDENTIFIER:name NL
+		{: RESULT = Ast.NativeType(pos(xleft, nameright), mod, name, Ast.NoTypeExpr()); :}
+	| FuncDef:x
+		{: RESULT = x; :}
+	| VarDef:x
+		{: RESULT = x; :}
+	| INIT:x NL INDENT Statements:body UNINDENT:y
+		{: RESULT = Ast.InitBlock(pos(xleft, yright), body); :}
+	| NATIVE:x FuncSignature:sig NL
+		{: RESULT = Ast.NativeFunc(pos(xleft, sig), Ast.Modifiers(), sig.getName(), sig.getParameters().copy(), (OptTypeExpr) sig.getReturnTyp().copy()); :}
+	| ClassDef:x
+		{: RESULT = x; :}
+	| ModuleDef:x
+		{: RESULT = x; :}
+	| Modifiers:mod FUNCTION:x TypeExpr:t DOT FuncSignature:sig NL INDENT Statements:body UNINDENT:y
+		{: RESULT = Ast.ExtensionFuncDef(pos(xleft, yright), mod, t, sig.getName(), sig.getTypeParameters().copy(), sig.getParameters().copy(), (OptTypeExpr) sig.getReturnTyp().copy(), body); :}
+;		
+
+ClassDef ::=
+	Modifiers:mod CLASS:x IDENTIFIER:name TypeParamDefs:typeParams NL INDENT ClassSlots:slots UNINDENT:y
+		{: RESULT = Ast.ClassDef(pos(xleft, yright), mod, name, typeParams, false, slots); :}
+;
+
+TypeParamDefs ::=
+	TypeParams:p
+	  	{: RESULT = AstHelper.transformTypeParamsToTyppeParamDefs(p); :}
+;
+
+TypeParams ::=
+	LBRACK:x TypeParamList:l RBRACK:y 
+		{: RESULT = l; :}
+	|
+		{: RESULT = Ast.TypeParams(); :}
+;
+
+TypeParamList ::=
+	TypeExpr:e COMMA TypeParamList:l
+		{: l.addFront(e); RESULT = l; :}
+	| TypeExpr:e
+		{: RESULT = Ast.TypeParams(e); :}
+;
+
+ModuleDef ::=
+	Modifiers:mod MODULE:x IDENTIFIER:name TypeParamDefs:typeParams NL INDENT ClassSlots:slots UNINDENT:y
+		{: RESULT = Ast.ModuleDef(pos(xleft, yright), mod, name, typeParams, slots); :}
+;
+
+ClassSlots ::=
+	Newlines ClassSlot:x ClassSlots:xs
+		{: xs.addFront(x); RESULT = xs; :}
+	| Newlines
+		{: RESULT = Ast.ClassSlots(); :}
+;
+
+ClassSlot ::=
+	Modifiers:mod CONSTRUCT:x LPAR Parameters:params RPAR NL INDENT Statements:body UNINDENT:y
+		{: RESULT = Ast.ConstructorDef(pos(xleft, yright), mod, params, body); :}
+	| Modifiers:mod USE:x IDENTIFIER:m TypeParams:typeParams NL
+		{: RESULT = Ast.ModuleUse(pos(xleft, mright), m, typeParams); :} 
+	| ONDESTROY:x NL INDENT Statements:body UNINDENT:y
+		{: RESULT = Ast.OnDestroyDef(pos(xleft, yright), body); :}
+	| VarDef:x
+		{: RESULT = x; :}
+	| FuncDef:x
+		{: RESULT = x; :} 
+;
+
+FuncDef ::=
+	  Modifiers:mod FUNCTION:x FuncSignature:sig NL INDENT Statements:body UNINDENT:y
+		{: RESULT = Ast.FuncDef(pos(xleft, yright), mod, sig.getName(), sig.getTypeParameters().copy(), sig.getParameters().copy(), (OptTypeExpr) sig.getReturnTyp().copy(), body); :}
+	| Modifiers:mod FUNCTION:x FuncSignature:sig NL
+		{: RESULT = Ast.FuncDef(pos(xleft, sig), mod, sig.getName(), sig.getTypeParameters().copy(), sig.getParameters().copy(), (OptTypeExpr) sig.getReturnTyp().copy(), Ast.WStatements()); :}
+;
+
+Modifiers ::=
+	  Modifier:x Modifiers:xs
+	  	{: xs.addFront(x); RESULT = xs; :}
+	| 
+		{: RESULT = Ast.Modifiers(); :} 
+;
+
+Modifier ::=
+	PUBLIC:x
+		{: RESULT = Ast.VisibilityPublic(pos(xleft, xright)); :}
+	| PRIVATE:x
+		{: RESULT = Ast.VisibilityPrivate(pos(xleft, xright)); :}
+	| PROTECTED:x
+		{: RESULT = Ast.VisibilityProtected(pos(xleft, xright)); :}
+	| PUBLICREAD:x
+		{: RESULT = Ast.VisibilityPublicread(pos(xleft, xright)); :}
+	| STATIC:x
+		{: RESULT = Ast.ModStatic(pos(xleft, xright)); :}
+	| OVERRIDE:x
+		{: RESULT = Ast.ModOverride(pos(xleft, xright)); :}
+	| ABSTRACT:x
+		{: RESULT = Ast.ModAbstract(pos(xleft, xright)); :}
+	| CONSTANT:x
+		{: RESULT = Ast.ModConstant(pos(xleft, xright)); :}
+;
+
+FuncSignature ::=
+	IDENTIFIER:name TypeParamDefs:typeParams LPAR Parameters:parameters RPAR RETURNS TypeExpr:typ
+		{: RESULT = Ast.FuncSignature(pos(nameleft, typ), name, typeParams, parameters, typ); :}
+	| IDENTIFIER:name TypeParamDefs:typeParams LPAR Parameters:parameters RPAR:y
+		{: RESULT = Ast.FuncSignature(pos(nameleft, yright), name, typeParams, parameters, Ast.NoTypeExpr()); :}
+;
+
+Parameters ::=
+	Parameter:x OtherParameters:xs 
+		{: xs.addFront(x); RESULT = xs; :}
+	|
+		{: RESULT = Ast.WParameters(); :}
+;
+
+OtherParameters ::=
+	COMMA Parameter:x OtherParameters:xs 
+		{: xs.addFront(x); RESULT = xs; :}
+	|
+		{: RESULT = Ast.WParameters(); :}
+;
+
+Parameter ::=
+	TypeExpr:typ IDENTIFIER:name
+		{: RESULT = Ast.WParameter(pos(typleft, nameright), Ast.Modifiers(), typ, name); :}
+;
+
+TypeExpr ::=
+	IDENTIFIER:name TypeParams:typeParams
+		{: RESULT = Ast.TypeExprSimple(pos(nameleft, nameright), name, typeParams); :}
+	| TypeExpr:e ARRAY:y
+		{: RESULT = Ast.TypeExprArray(pos(e, yright), e); :}
+	| THISTYPE:x
+		{: RESULT = Ast.TypeExprThis(pos(xleft, xright)); :}
+;
+
+
+
+/*
+ArraySizes ::= 
+	LSQUARE Expr:x RSQUARE ArraySizes:xs
+		{: xs.addFront(x); RESULT = xs; :}
+	|
+		{: RESULT = Ast.ArraySizes(); :}
+;
+*/
+VarDef ::=
+	  Modifiers:mod TypeExpr:typ IDENTIFIER:name EQ Expr:i NL
+		{: RESULT = Ast.GlobalVarDef(pos(typleft, i), mod, typ, name, i); :}
+	| Modifiers:mod TypeExpr:typ IDENTIFIER:name NL
+		{: RESULT = Ast.GlobalVarDef(pos(typleft, nameright), mod, typ, name, Ast.NoExpr()); :}
+;
+
+Statements ::=
+	Newlines Statement:x Statements:xs
+		{: xs.addFront(x); RESULT = xs; :}
+	| Newlines
+		{: RESULT = Ast.WStatements(); :}
+;
+
+Statement ::=
+	StmtIf:x 
+		{: RESULT = x; :}
+	| StmtWhile:x
+		{: RESULT = x; :} 
+	| LocalVarDef:x
+		{: RESULT = x; :} 
+	| StmtSet:x
+		{: RESULT = x; :}
+	| StmtCall:x
+		{: RESULT = x; :}
+	| StmtReturn:x
+		{: RESULT = x; :}
+	| StmtDestroy:x
+		{: RESULT = x; :} 
+	| FOR:x LocalVarDefInline:loopVar EQ Expr:from TO Expr:to NL INDENT Statements:body UNINDENT:y
+		{: RESULT = Ast.StmtForRange(pos(xleft, yright), loopVar, from, to, Ast.ExprIntVal(pos(to, Integer.MIN_VALUE), 1), body); :}
+	| FOR:x LocalVarDefInline:loopVar EQ Expr:from TO Expr:to STEP Expr:step NL INDENT Statements:body UNINDENT:y
+		{: RESULT = Ast.StmtForRange(pos(xleft, yright), loopVar, from, to, step, body); :}
+	| FOR:x LocalVarDefInline:loopVar EQ Expr:from DOWNTO Expr:to NL INDENT Statements:body UNINDENT:y
+		{: RESULT = Ast.StmtForRangeDown(pos(xleft, yright), loopVar, from, to, Ast.ExprIntVal(pos(to, Integer.MIN_VALUE), 1), body); :}
+	| FOR:x LocalVarDefInline:loopVar EQ Expr:from DOWNTO Expr:to STEP Expr:step NL INDENT Statements:body UNINDENT:y
+		{: RESULT = Ast.StmtForRangeDown(pos(xleft, yright), loopVar, from, to, step, body); :}
+	| FOR:x LocalVarDefInline:loopVar IN Expr:in NL INDENT Statements:body UNINDENT:y
+		{: RESULT = Ast.StmtForIn(pos(xleft, yright), loopVar, in, body); :}
+	| BREAK:x NL
+		{: RESULT = Ast.StmtExitwhen(pos(xleft, xright), Ast.ExprBoolVal(pos(xleft, xright), true)); :}
+	| error:x NL
+		{: RESULT = Ast.StmtErr(pos(xleft, xright)); :}
+;
+
+StmtDestroy ::=
+	DESTROY:x Expr:e NL
+		{: RESULT = Ast.StmtDestroy(pos(xleft, e), e); :}
+;
+
+StmtReturn ::=
+	RETURN:x Expr:result NL
+		{: RESULT = Ast.StmtReturn(pos(xleft, result), result); :}
+;
+
+StmtIf ::=
+	IF:x Expr:cond NL INDENT Statements:thenStatements UNINDENT:y
+		{: RESULT = Ast.StmtIf(pos(xleft, yright), cond, thenStatements, Ast.WStatements()); :}
+	| IF:x Expr:cond NL INDENT Statements:thenStatements UNINDENT ELSE:y ElseStatements:elseStatements
+		{: RESULT = Ast.StmtIf(pos(xleft, elseStatements.get(elseStatements.size()-1)), cond, thenStatements, elseStatements); :}
+;
+
+ElseStatements ::= 
+	StmtIf:x 
+		{: RESULT = Ast.WStatements(x); :}
+	| NL INDENT Statements:x UNINDENT
+		{: RESULT = x; :}
+;
+
+StmtWhile ::=
+	WHILE:x Expr:cond NL INDENT Statements:body UNINDENT:y
+		{: RESULT = Ast.StmtWhile(pos(xleft, yright), cond, body); :}
+;
+
+LocalVarDef ::=
+	VAL:x IDENTIFIER:name EQ Expr:i NL
+		{: RESULT = Ast.LocalVarDef(pos(xleft, i), Ast.Modifiers(Ast.ModConstant(pos(xleft, xright))), Ast.NoTypeExpr(), name, i); :}
+	| VAL:x TypeExpr:typ IDENTIFIER:name EQ Expr:i NL
+		{: RESULT = Ast.LocalVarDef(pos(xleft, i), Ast.Modifiers(Ast.ModConstant(pos(xleft, xright))), typ, name, i); :}
+	| TypeExpr:typ IDENTIFIER:name EQ Expr:i NL
+		{: RESULT = Ast.LocalVarDef(pos(typleft, i), Ast.Modifiers(), typ, name, i); :}
+	| TypeExpr:typ IDENTIFIER:name NL
+		{: RESULT = Ast.LocalVarDef(pos(typleft, nameright), Ast.Modifiers(), typ, name, Ast.NoExpr()); :}
+;
+
+LocalVarDefInline ::=
+	TypeExpr:typ IDENTIFIER:name
+		{: RESULT = Ast.LocalVarDef(pos(typleft, nameright), Ast.Modifiers(), typ, name, Ast.NoExpr()); :}
+;
+
+StmtSet ::= 
+	  ExprAssignable:left EQ Expr:right NL
+		{: RESULT = Ast.StmtSet(pos(left, right), left, Ast.OpAssign(),  right); :}
+	| ExprAssignable:left PLUS_EQ Expr:right NL
+		{: RESULT = Ast.StmtSet(pos(left, right), left, Ast.OpPlusAssign(),  right); :}
+	| ExprAssignable:left MINUS_EQ Expr:right NL
+		{: RESULT = Ast.StmtSet(pos(left, right), left, Ast.OpMinusAssign(),  right); :}
+	| ExprAssignable:left MULT_EQ Expr:right NL
+		{: RESULT = Ast.StmtSet(pos(left, right), left, Ast.OpMultAssign(),  right); :}
+	| ExprAssignable:left PLUS_PLUS:x NL
+		{: RESULT = Ast.StmtSet(pos(left, xright), left, Ast.OpPlusAssign(), Ast.ExprIntVal(pos(xleft, xright), 1)); :}
+	| ExprAssignable:left MINUS_MINUS:x NL
+		{: RESULT = Ast.StmtSet(pos(left, xright), left, Ast.OpMinusAssign(), Ast.ExprIntVal(pos(xleft, xright), 1)); :}
+	| ExprAssignable:left NL
+		{: RESULT = Ast.StmtSet(pos(left, left), left, Ast.OpAssign(), Ast.ExprIncomplete(pos(left, Integer.MIN_VALUE), "missing right side of expression")); :}
+;
+
+ExprAssignable ::=
+	ExprMemberVar:x
+		{: RESULT = x; :} 
+	| ExprMemberArrayVar:x
+		{: RESULT = x; :}
+	| ExprVarAccess:x
+		{: RESULT = x; :} 
+	| ExprVarArrayAccess:x
+		{: RESULT = x; :}
+;
+
+ExprVarAccess ::=
+	IDENTIFIER:name
+		{: RESULT = Ast.ExprVarAccess(pos(nameleft, nameright), name); :}
+;
+
+ExprVarArrayAccess ::=
+	IDENTIFIER:name Indexes:indexes
+		{: RESULT = Ast.ExprVarArrayAccess(pos(nameleft, indexes.get(indexes.size()-1)), name, indexes); :}
+;
+
+
+StmtCall ::=
+	ExprMemberMethod:x NL
+	  	{: RESULT = x; :} 
+	| ExprFunctionCall:x NL
+	  	{: RESULT = x; :} 
+	| ExprNewObject:x NL
+	  	{: RESULT = x; :}
+;
+
+
+
+Expr ::= 
+	  ExprBinary:x
+	  	{: RESULT = x; :}
+	| ExprUnary:x
+	  	{: RESULT = x; :}
+	| ExprMemberVar:x
+	  	{: RESULT = x; :}
+	| ExprMemberArrayVar:x
+		{: RESULT = x; :}
+	| ExprMemberMethod:x
+	  	{: RESULT = x; :}
+	| ExprFunctionCall:x
+	  	{: RESULT = x; :}
+	| ExprNewObject:x
+	  	{: RESULT = x; :}
+	| ExprAtomic:x
+	  	{: RESULT = x; :}
+	| ExprCast:x
+		{: RESULT = x; :}
+	| Expr:left DOT:y
+		{: RESULT = Ast.ExprMemberVar(pos(left,yright), left, ""); :}
+;
+	
+	
+ExprCast ::= 
+	Expr:e CASTTO TypeExpr:t 
+		{: RESULT = Ast.ExprCast(pos(e, t), t, e); :} 
+;	
+	
+ExprMemberVar ::=
+	Expr:left DOT IDENTIFIER:name
+		{: RESULT = Ast.ExprMemberVar(pos(left,nameright), left, name); :}	
+;
+
+ExprMemberArrayVar ::=
+	Expr:left DOT IDENTIFIER:name Indexes:indexes
+		{: RESULT = Ast.ExprMemberArrayVar(pos(left, indexes.get(indexes.size()-1)), left, name, indexes); :}
+;
+
+ExprMemberMethod ::=
+	Expr:left DOT IDENTIFIER:name TypeParams:typeParams LPAR Arguments:args RPAR:y
+		{: RESULT = Ast.ExprMemberMethod(pos(left, yright), left, name, typeParams, args); :}
+;
+
+
+ExprAtomic ::= 
+	  INTEGER_LITERAL:i
+		{: RESULT = Ast.ExprIntVal(pos(ileft, iright), i); :}
+	| NULL:x
+		{: RESULT = Ast.ExprNull(pos(xleft, xright)); :}
+	| STRING_LITERAL:s
+		{: RESULT = Ast.ExprStringVal(pos(sleft, sright), s); :}
+	| LPAR Expr:e RPAR
+		{: RESULT = e; :}
+	| TRUE:x
+		{: RESULT = Ast.ExprBoolVal(pos(xleft, xright), true); :} 
+	| FALSE:x
+		{: RESULT = Ast.ExprBoolVal(pos(xleft, xright), false); :}
+	| THIS:x
+		{: RESULT = Ast.ExprThis(pos(xleft, xright)); :}
+	| FUNCTION:x IDENTIFIER:name
+		{: RESULT = Ast.ExprFuncRef(pos(xleft, nameright), name); :}
+	| REAL_LITERAL:x
+		{: RESULT = Ast.ExprRealVal(pos(xleft, xright), x); :}
+	| ExprVarAccess:x
+		{: RESULT = x; :} 
+	| ExprVarArrayAccess:x
+		{: RESULT = x; :}
+;	
+
+ExprNewObject ::=
+ 	NEW:x IDENTIFIER:name TypeParams:typeParams LPAR Arguments:args RPAR:y
+		{: RESULT = Ast.ExprNewObject(pos(xleft, yright), name, typeParams, args); :}
+;
+
+Indexes ::=
+	LSQUARE Expr:x RSQUARE Indexes:xs
+		{: xs.addFront(x); RESULT = xs; :}
+	| LSQUARE Expr:x RSQUARE
+		{: RESULT = Ast.Indexes(x); :}
+;
+
+
+
+Arguments ::=
+	Expr:x ArgumentRest:xs
+		{: xs.addFront(x); RESULT = xs; :}
+	|
+		{: RESULT = Ast.Arguments(); :}
+;
+
+ArgumentRest ::=
+	COMMA Expr:x ArgumentRest:xs
+		{: xs.addFront(x); RESULT = xs; :}
+	|
+		{: RESULT = Ast.Arguments(); :}
+;
+
+
+
+ExprBinary ::= 
+	  Expr:left OR Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpOr(), right); :}
+	| Expr:left AND Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpAnd(), right); :}
+	| Expr:left PLUS Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpPlus(), right); :}
+	| Expr:left MINUS Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpMinus(), right); :}
+	| Expr:left MULT Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpMult(), right); :}
+	| Expr:left DIV_REAL Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpDivReal(), right); :}
+	| Expr:left DIV_INT Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpDivInt(), right); :}
+	| Expr:left MOD_REAL Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpModReal(), right); :}
+	| Expr:left MOD_INT Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpModInt(), right); :}
+	| Expr:left EQEQ Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpEquals(), right); :}
+	| Expr:left GTEQ Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpGreaterEq(), right); :}
+	| Expr:left LTEQ Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpLessEq(), right); :}
+	| Expr:left LT Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpLess(), right); :}
+	| Expr:left GT Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpGreater(), right); :}
+	| Expr:left NOTEQ Expr:right
+		{: RESULT = Ast.ExprBinary(pos(left, right), left, Ast.OpUnequals(), right); :}
+;
+
+ExprUnary ::=
+	NOT:x Expr:right
+		{: RESULT = Ast.ExprUnary(pos(xleft, right), Ast.OpNot(), right); :}
+	| MINUS:x Expr:right
+		{: RESULT = Ast.ExprUnary(pos(xleft, right), Ast.OpMinus(), right); :}
+;
+
+ExprFunctionCall ::=
+	IDENTIFIER:name TypeParams:typeParams LPAR Arguments:args RPAR:y
+		{: RESULT = Ast.ExprFunctionCall(pos(nameleft, yright), name, typeParams, args); :}
+;
+
+
+
+
+
+
+
+// ++++++++++++++++
+// Jass stuff:
+
+JassToplevelDeclaration ::=
+	  JassGlobalBlock:x 
+		{: RESULT = x; :}
+	| JassFuncDef:x
+		{: RESULT = x; :}
+	| JassTypeDecl:x
+		{: RESULT = x; :}
+	| JassNativeDecl:x
+		{: RESULT = x; :}
+;
+
+
+
+JassTypeDecl ::=
+	TYPE:x IDENTIFIER:name EXTENDS TypeExpr:extendsName NL
+		{: RESULT = Ast.NativeType(pos(xleft, extendsName), Ast.Modifiers(), name, extendsName); :}
+;
+
+
+JassGlobalBlock ::=
+	GLOBALS NL JassGlobalDecls:x ENDGLOBALS NL
+		{: RESULT = x; :}
+;
+
+JassGlobalDecls ::=
+	Newlines JassGlobalDecl:x JassGlobalDecls:xs
+		{: xs.addFront(x); RESULT = xs; :}
+	| Newlines 
+		{: RESULT = Ast.JassGlobalBlock(); :}
+;
+
+JassGlobalDecl ::=
+	CONSTANT:x TypeExpr:typ IDENTIFIER:name EQ Expr:i NL
+		{: RESULT = Ast.GlobalVarDef(pos(xleft, i), Ast.Modifiers(Ast.ModConstant(pos(xleft, xright))), typ, name, i); :}
+	| TypeExpr:typ IDENTIFIER:name EQ Expr:i NL
+		{: RESULT = Ast.GlobalVarDef(pos(typ, i), Ast.Modifiers(), typ, name, i); :}
+	| TypeExpr:typ IDENTIFIER:name NL
+		{: RESULT = Ast.GlobalVarDef(pos(typ, nameright), Ast.Modifiers(), typ, name, Ast.NoExpr()); :}
+;
+
+JassNativeDecl ::=
+	NATIVE:x JassFuncSignature:sig NL
+		{: RESULT = Ast.NativeFunc(pos(xleft, sig), Ast.Modifiers(), sig.getName(), sig.getParameters().copy(), (OptTypeExpr) sig.getReturnTyp().copy()); :}
+	| CONSTANT:x NATIVE JassFuncSignature:sig NL
+		{: RESULT = Ast.NativeFunc(pos(xleft, sig), Ast.Modifiers(), sig.getName(), sig.getParameters().copy(), (OptTypeExpr) sig.getReturnTyp().copy()); :}
+;
+
+JassFuncDef ::=
+	FUNCTION:x JassFuncSignature:sig NL JassLocals:body1 JassStatements:body2 ENDFUNCTION:y NL
+		{: 
+			body1.addAll(body2.removeAll());
+			RESULT = Ast.FuncDef(pos(xleft, yright), Ast.Modifiers(), sig.getName(), sig.getTypeParameters().copy(), sig.getParameters().copy(), (OptTypeExpr) sig.getReturnTyp().copy(), body1); 
+		:}
+;
+
+
+JassFuncSignature ::=
+	IDENTIFIER:name TAKES JassParameters:parameters RETURNS TypeExpr:typ
+		{: RESULT = Ast.FuncSignature(pos(nameleft, typ), name, Ast.TypeParamDefs(), parameters, typ); :}
+	| IDENTIFIER:name TAKES JassParameters:parameters RETURNS NOTHING:y
+		{: RESULT = Ast.FuncSignature(pos(nameleft, yright), name, Ast.TypeParamDefs(), parameters, Ast.NoTypeExpr()); :}
+;
+
+JassParameters ::=
+	 NOTHING
+		{: RESULT = Ast.WParameters(); :}
+	| Parameter:x OtherParameters:xs 
+		{: xs.addFront(x); RESULT = xs; :}   
+;
+
+JassLocals ::=
+	  Newlines JassLocal:x JassLocals:xs
+		{: xs.addFront(x); RESULT = xs; :}
+	| Newlines 
+		{: RESULT = Ast.WStatements(); :}
+;
+
+JassLocal ::=
+	  LOCAL:x TypeExpr:typ IDENTIFIER:name EQ Expr:i NL
+		{: RESULT = Ast.LocalVarDef(pos(xleft, i), Ast.Modifiers(), typ, name, i); :}
+	| LOCAL:x TypeExpr:typ IDENTIFIER:name NL
+		{: RESULT = Ast.LocalVarDef(pos(xleft, nameright), Ast.Modifiers(), typ, name, Ast.NoExpr()); :}
+;
+
+JassStatements ::=
+	Newlines JassStatement:x JassStatements:xs
+		{: xs.addFront(x); RESULT = xs; :}
+	| Newlines  
+		{: RESULT = Ast.WStatements(); :}
+;
+
+JassStatement ::=
+	  JassStatementIf:x
+		{: RESULT = x; :}
+	| LOOP:x NL JassStatements:body ENDLOOP:y NL
+		{: RESULT = Ast.StmtLoop(pos(xleft, yright), body); :}
+	| EXITWHEN:x Expr:e NL
+		{: RESULT = Ast.StmtExitwhen(pos(xleft, e), e); :}
+	| RETURN:x NL
+		{: RESULT = Ast.StmtReturn(pos(xleft, xright), Ast.NoExpr()); :}
+	| RETURN:x Expr:e NL
+		{: RESULT = Ast.StmtReturn(pos(xleft, e), e); :}
+	| SET:x ExprAssignable:left EQ Expr:right NL
+		{: RESULT = Ast.StmtSet(pos(xleft, right), left, Ast.OpAssign(),  right); :}
+	| CALL:x ExprFunctionCall:call
+		{: RESULT = call; :}
+;  
+
+
+JassStatementIf ::=
+	IF:x Expr:cond THEN:y NL JassStatements:thenStatements JasselseIfs:elseStatements
+		{: 
+			WPos pos;
+			if (elseStatements.size() > 0) {
+				pos = pos(xleft, elseStatements.get(elseStatements.size() - 1));
+			} else {
+				if (thenStatements.size() > 0) {
+					pos = pos(xleft, thenStatements.get(thenStatements.size()-1));
+				} else {
+					pos = pos(xleft, yright);
+				}
+			}
+			RESULT = Ast.StmtIf(pos(xleft, xright), cond, thenStatements, elseStatements); :}
+;
+
+JasselseIfs ::=
+	ELSEIF:x Expr:cond THEN NL JassStatements:thenStatements JasselseIfs:elseStatements
+		{: RESULT = Ast.WStatements(Ast.StmtIf(pos(xleft, xright), cond,  thenStatements, elseStatements)); :}
+	| ELSE NL JassStatements:s ENDIF NL 
+		{: RESULT = s; :}
+	| ENDIF NL
+		{: RESULT = Ast.WStatements(); :}
+;
+
+
