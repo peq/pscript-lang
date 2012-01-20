@@ -60,7 +60,7 @@ public class JassManager {
 //		return name;
 //	}
 	
-	private void markNameAsUsed(String name) {
+	void markNameAsUsed(String name) {
 		givenNames.add(name);
 	}
 	

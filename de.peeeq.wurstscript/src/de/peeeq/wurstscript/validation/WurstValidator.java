@@ -148,8 +148,14 @@ public class WurstValidator {
 		for (Method m : typeToMethod.get(e.getClass())) {
 			try {
 				m.invoke(this, e);
-			} catch (Throwable t) {
-				t.printStackTrace();
+			} catch (Error t) {
+				throw t;
+			} catch (IllegalArgumentException t) {
+				throw new Error(t);
+			} catch (IllegalAccessException t) {
+				throw new Error(t);
+			} catch (InvocationTargetException t) {
+				throw new Error(t);
 			}
 		}
 	}
@@ -166,8 +172,13 @@ public class WurstValidator {
 	}
 
 	@CheckMethod
-	public void visit(StmtSet s) {
+	public void checkStmtSet(StmtSet s) {
 
+		NameDef nameDef = s.getUpdatedExpr().attrNameDef();
+		if (!(nameDef instanceof VarDef)) {
+			attr.addError(s.getUpdatedExpr().getSource(), "Invalid assignment. This is not a variable, this is a " + Utils.printElement(nameDef));
+		}
+		
 		PscriptType leftType = s.getUpdatedExpr().attrTyp();
 		PscriptType rightType = s.getRight().attrTyp();
 
@@ -652,7 +663,7 @@ public class WurstValidator {
 				
 				@Override
 				public void case_FuncDef(FuncDef f) {
-					if (f.attrNearestClassOrModule() != null) {
+					if (f.attrNearestStructureDef() != null) {
 						check(VisibilityPrivate.class, VisibilityProtected.class,
 								ModAbstract.class, ModOverride.class, ModStatic.class);
 					} else {
@@ -705,4 +716,5 @@ public class WurstValidator {
 			}
 		}
 	}
+	
 }

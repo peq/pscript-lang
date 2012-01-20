@@ -125,6 +125,40 @@ public class PackageTests extends PscriptTest {
 	}
 	
 	@Test
+	public void test_typename_as_var() {
+		assertError(false, "type name 'unit'",
+				"type unit extends handle",
+				"package A",
+				"	unit unit",
+				"	init",
+				"		unit a = null",
+				"		unit = a",
+				"endpackage");
+	}
+	
+	@Test
+	public void test_typename_as_var2() {
+		assertOk(false,
+				"type unit extends handle",
+				"package A",
+				"	int unit",
+				"	init",
+				"		unit = 14",
+				"endpackage");
+	}
+	
+
+	@Test
+	public void test_typename_as_var3() {
+		assertError(false, "Invalid assignment",
+				"type player extends handle",
+				"package A",
+				"	function foo(player p)",
+				"		player = p",
+				"endpackage");
+	}
+	
+	@Test
 	public void test_import_var() {
 		assertOk(false,
 				"package A",
