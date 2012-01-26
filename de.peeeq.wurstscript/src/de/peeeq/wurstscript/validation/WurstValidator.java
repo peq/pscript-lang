@@ -75,6 +75,7 @@ import de.peeeq.wurstscript.ast.WPos;
 import de.peeeq.wurstscript.attributes.CheckHelper;
 import de.peeeq.wurstscript.attributes.attr;
 import de.peeeq.wurstscript.gui.ProgressHelper;
+import de.peeeq.wurstscript.types.PScriptTypeArray;
 import de.peeeq.wurstscript.types.PScriptTypeBool;
 import de.peeeq.wurstscript.types.PScriptTypeInt;
 import de.peeeq.wurstscript.types.PScriptTypeReal;
@@ -159,7 +160,12 @@ public class WurstValidator {
 			} catch (IllegalAccessException t) {
 				throw new Error(t);
 			} catch (InvocationTargetException t) {
-				throw new Error(t);
+				Throwable cause = t.getCause();
+				if (cause instanceof Error) {
+					throw (Error)cause;
+				} else {
+					throw new Error(cause);
+				}
 			}
 		}
 	}
@@ -283,6 +289,12 @@ public class WurstValidator {
 			PscriptType leftType = s.attrTyp();
 			PscriptType rightType = initial.attrTyp();
 			checkAssignment(Utils.isJassCode(s), s.getSource(), leftType, rightType);
+		}
+		
+		
+		if (s.attrTyp() instanceof PScriptTypeArray && !s.attrIsStatic() && s.attrIsDynamicClassMember()) {
+			attr.addError(s.getSource(), "Array variables must be static.\n" +
+					"Hint: use Lists for dynamic stuff.");
 		}
 	}
 
