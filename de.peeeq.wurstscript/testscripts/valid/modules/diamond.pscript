@@ -1,0 +1,60 @@
+package test 
+		
+	native testFail(string msg)
+	native testSuccess()
+	native println(string s)
+	native I2S(int x) returns string
+
+	module A 
+		int x
+	
+		function setX(int x) 
+			println("set x " + I2S(x))
+			this.x = x
+		
+		
+		function getX() returns int 
+			println("get x " + I2S(x))
+			return x
+		
+	
+	
+	module B 
+		use A
+	
+	
+	module C 
+		use A
+	
+	
+	
+	class D 
+		use B
+		use C
+		
+		override function setX(int x) 
+			// we have two places where we could store x, so just split it ;)
+			B.setX(x div 2)
+			C.setX(x - B.getX())
+		
+		
+		override function getX() returns int 
+			return B.getX() + C.getX()
+		
+		
+			
+	
+	
+	
+	init 
+		D d = new D()
+		
+		d.setX(5)
+		
+		if d.getX() != 5 
+			testFail("foo fail" + I2S(d.getX()))
+		
+			
+		testSuccess()
+	
+endpackage
