@@ -1,0 +1,9 @@
+// This is the package which is imported into any other package ...
+
+package Wurst
+
+    import public ExtensionFunctions
+    import public Real
+    import public Integer
+
+endpackage

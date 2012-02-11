@@ -1,0 +1,76 @@
+package de.peeeq.wurstscript.jassIm
+
+
+abstract syntax:
+	
+ImProg(ImVars globals, ImFunctions functions)
+
+ImVars * ImVar
+ImFunctions * ImFunction
+
+ImVar(ImType type, String name)
+
+ImType = 
+	  ImSimpleType(String typename)
+	| ImArrayType(String typename)
+	| ImTupleType(ImTypes types)
+	| ImVoid()
+	
+ImTypes * ImType
+
+ImFunction(ImVars parameters, ImType returnType, ImVars locals, ImStmts body, boolean isNative)
+	
+ImStmts * ImStmt
+
+ImStmt = 
+	  ImIf(ImExpr condition, ImStmts thenBlock, ImStmts elseBlock)
+	| ImLoop(ImStmts body)
+	| ImExitwhen(ImExpr condition)
+	| ImReturn(ImExprOpt returnValue)
+	| ImSet(&ImVar left, ImExpr right)
+	| ImSetTuple(&ImVar left, int tupleIndex, ImExpr right)
+	| ImSetArray(&ImVar left, ImExpr index, ImExpr right)
+	| ImSetArrayTuple(&ImVar left, ImExpr index, int tupleIndex, ImExpr right)
+	| ImExpr
+	
+	
+ImExprOpt = 
+	  ImExpr
+	| ImNoExpr()
+	
+ImExprs * ImExpr
+	
+ImExpr = 
+	  ImCall(&ImFunction func, ImExprs arguments)
+	| ImStatementExpr(ImStmts statements, ImExpr expr)
+	| ImVarAccess(&ImVar var)
+	| ImVarArrayAccess(&ImVar var, ImExpr index)
+	| ImTupleExpr(ImExprs exprs)
+	| ImTupleSelection(ImExpr tupleExpr, int tupleIndex)
+	| ImConst
+	
+ImConst = 
+	  ImIntVal(int valI)
+	| ImRealVal(double valR)
+	| ImStringVal(String valS)
+	| ImBoolVal(boolean valB)
+	| ImFuncRef(&ImFunction func)
+	| ImNull()
+	
+attributes:
+	
+
+	
+ImStmt.flatten(
+		de.peeeq.wurstscript.translation.imtranslation.Translator translator, 
+		de.peeeq.wurstscript.jassIm.ImFunction f	
+	)
+	returns java.util.List<ImStmt>
+	implemented by de.peeeq.wurstscript.translation.imtranslation.Flatten.flatten
+	
+ImExpr.flattenExpr(
+		de.peeeq.wurstscript.translation.imtranslation.Translator translator, 
+		de.peeeq.wurstscript.jassIm.ImFunction f	
+	)
+	returns ImExpr
+	implemented by de.peeeq.wurstscript.translation.imtranslation.Flatten.flattenExpr
