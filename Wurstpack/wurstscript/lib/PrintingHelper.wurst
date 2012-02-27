@@ -1,0 +1,36 @@
+package PrintingHelper
+    
+    public int DEBUG_LEVEL = 1
+    
+    public function debugPrint(string msg, int level)
+        if level >= DEBUG_LEVEL
+            print(msg)
+            
+    public function print(string msg)
+        for int i = 0 to 12
+            DisplayTimedTextToPlayer(Player(i), 0., 0., 60., msg)
+
+    public function printNote(string msg)
+        for int i = 0 to 12
+            DisplayTimedTextToPlayer(Player(i), 0., 0., 60., "|cffFFFF00[NOTIFICATION] - " + msg + "|r")
+
+    public function printWarning(string msg)
+        for int i = 0 to 12
+            DisplayTimedTextToPlayer(Player(i), 0., 0., 60., "|cffFF8000[WARNING] - " + msg + "|r")
+
+    public function printError(string msg)
+        for int i = 0 to 12
+            DisplayTimedTextToPlayer(Player(i), 0., 0., 60., "|cffFF0000[ERROR] - " + msg + "|r")
+
+    public function real.toString() returns string
+        return R2S(this)
+        
+    public function int.toString() returns string
+        return I2S(this)
+
+    public function boolean.toString() returns string
+        if this
+            return "true"
+        else
+            return "false"
+endpackage 

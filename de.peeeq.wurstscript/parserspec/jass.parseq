@@ -1,0 +1,123 @@
+package de.peeeq.wurstscript.jassAst
+
+
+abstract syntax:
+
+JassProg(JassTypeDefs defs, JassVars globals, JassNatives natives, JassFunctions functions)
+
+JassNatives * JassNative
+JassTypeDefs * JassTypeDef
+JassVars * JassVar
+JassSimpleVars * JassSimpleVar
+JassFunctions * JassFunction
+
+JassTypeDef( String name, String ext)
+
+JassNative(String name, JassSimpleVars params, String returnType )
+	
+	
+JassVar = 
+	  JassSimpleVar(String type, String name)
+	| JassArrayVar(String type, String name)
+	| JassInitializedVar(String type, String name, JassExpr val )
+	| JassConstantVar(String type, String name, JassExpr val )
+	
+JassFunction(String name, JassSimpleVars params, String returnType, JassVars locals, JassStatements body)
+
+JassStatements * JassStatement  
+
+JassStatement	=
+	  JassStmtIf(JassExpr cond, JassStatements thenBlock, JassStatements elseBlock)
+	| JassStmtLoop(JassStatements body)
+	| JassStmtSet(String left, JassExpr right)
+	| JassStmtSetArray(String left, JassExpr index, JassExpr right)
+	| JassStmtCall(String funcName, JassExprlist arguments)
+	| JassStmtReturn(JassExpr returnValue)
+	| JassStmtReturnVoid()
+	| JassStmtExitwhen(JassExpr cond)
+	
+
+JassExprlist * JassExpr
+
+JassExpr = 
+	  JassExprBinary(JassExpr leftExpr, JassOpBinary op, JassExpr right) // left = a, op = "and" right="b" --> a and b k?
+	| JassExprUnary(JassOpUnary opU, JassExpr right)
+	| JassExprFunctionCall(String funcName, JassExprlist arguments)
+	| JassExprAtomic
+	
+	
+JassExprAtomic = 
+	  JassExprIntVal(int valI)
+	| JassExprRealVal(String valR)
+	| JassExprStringVal(String valS)
+	| JassExprBoolVal(boolean valB)
+	| JassExprFuncRef(String funcName)
+	| JassExprVarAccess(String varName)
+	| JassExprVarArrayAccess(String varName, JassExpr index)
+	| JassExprNull()
+	
+JassOpBinary = 
+	  JassOpOr() 
+	| JassOpAnd()
+	| JassOpEquals()
+	| JassOpUnequals()
+	| JassOpLessEq()
+	| JassOpLess()
+	| JassOpGreaterEq()
+	| JassOpGreater()
+	| JassOpPlus()
+	| JassOpMinus()
+	| JassOpMult()
+	| JassOpDiv()
+	
+JassOpUnary = 
+	  JassOpNot()
+	| JassOpMinus
+	
+JassOp = JassOpBinary | JassOpUnary	
+	
+JassFuncRef = JassExprFuncRef | JassExprFunctionCall | JassStmtCall
+	
+
+attributes:
+
+JassProg.attrIgnoredVariables
+	returns java.util.Set<JassVar>
+	implemented by de.peeeq.wurstscript.attributes.JassAttributes.attrIgnoredVariables
+
+JassProg.attrComments
+	returns java.util.Map<JassAstElement, String>
+	implemented by de.peeeq.wurstscript.attributes.JassAttributes.attrComments
+	
+JassProg.attrIgnoredFunctions
+	returns java.util.Set<JassFunction>
+	implemented by de.peeeq.wurstscript.attributes.JassAttributes.attrIgnoredFunctions
+	
+JassFuncRef.attrFuncDef
+	returns JassFunction
+	implemented by de.peeeq.wurstscript.attributes.JassAttributes.attrFuncDef
+
+	
+JassExpr.print(java.lang.StringBuilder sb, boolean withSpace)
+	returns void
+	implemented by de.peeeq.wurstscript.jassprinter.ExprPrinter.print
+	
+JassTypeDef.print(java.lang.StringBuilder sb, boolean withSpace)
+	returns void
+	implemented by de.peeeq.wurstscript.jassprinter.JassPrinter.printTypeDef
+	
+JassNative.print(java.lang.StringBuilder sb, boolean withSpace)
+	returns void
+	implemented by de.peeeq.wurstscript.jassprinter.JassPrinter.printNative
+
+JassStatement.print(java.lang.StringBuilder sb, int indent, boolean withSpace)
+	returns void
+	implemented by de.peeeq.wurstscript.jassprinter.StatementPrinter.print
+
+JassOp.print(java.lang.StringBuilder sb, boolean withSpace, boolean useParanthesesLeft, boolean useParanthesesRight)
+	returns void
+	implemented by de.peeeq.wurstscript.jassprinter.OpPrinter.print
+
+JassOp.asString()
+	returns String
+	implemented by de.peeeq.wurstscript.jassprinter.OpPrinter.asString
